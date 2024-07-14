@@ -3,14 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>1인칭 길찾기 게임</title>
-    <link rel="stylesheet" href="css/style.css">
+    <title>3D Maze Game</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
 </head>
 <body>
     <div id="gameContainer"></div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="js/controls.js"></script>
-    <script src="js/game.js"></script>
-    <script src="js/main.js"></script>
+    <script type="module">
+        import { Game } from './js/game.js';
+
+        const container = document.getElementById('gameContainer');
+        const game = new Game(container);
+        game.init();
+        game.animate();
+    </script>
 </body>
 </html>
