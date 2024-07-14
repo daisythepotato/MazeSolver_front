@@ -1,6 +1,6 @@
 import * as THREE from 'https://cdn.skypack.dev/three@0.128.0';
 import { Player } from './player.js';
-import { generateMaze } from './mazeGenerator.js';
+import { NPC } from './npc.js';
 
 export class Game {
     constructor(container) {
@@ -17,9 +17,12 @@ export class Game {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.container.appendChild(this.renderer.domElement);
 
-        this.player = null;
-
         this.collidableObjects = [];
+        // 플레이어의 초기 위치를 미로의 왼쪽 위 모서리로 설정
+        const playerInitialPosition = new THREE.Vector3(-23, 0.5, -23);
+        this.player = new Player(this.scene, this.camera, playerInitialPosition);
+        this.npc = new NPC(this.scene, this.collidableObjects);
+
         this.keyStates = {};
 
         this.speed = 0.1;
@@ -33,10 +36,9 @@ export class Game {
     }
 
     init() {
-        this.camera.position.set(0, 1.5, 5);
-        this.camera.lookAt(0, 1.5, 0);
-        this.createMaze();
-        this.createPlayer();
+        this.camera.position.set(0, 1.5, 5); 
+        this.camera.lookAt(0, 1.5, 0); 
+        this.addMaze();
     }
 
     addLights() {
@@ -47,65 +49,40 @@ export class Game {
         this.scene.add(directionalLight);
     }
 
-    createMaze() {
-        const mazeSize = 11;
-        const maze = generateMaze(mazeSize, mazeSize);
+    addMaze() {
+        const mazeSize = 50;  // 미로의 크기
+        const wallHeight = 5; // 벽의 높이
+        const wallThickness = 0.5; // 벽의 두께
 
-        const wallHeight = 10;
-        const wallThickness = 1;
-        const scale = 10;
+        // 바닥 생성
+        const floorGeometry = new THREE.PlaneGeometry(mazeSize, mazeSize);
+        const floorMaterial = new THREE.MeshBasicMaterial({ color: 0xcccccc });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = -Math.PI / 2;
+        this.scene.add(floor);
 
-        const wallGeometry = new THREE.BoxGeometry(scale, wallHeight, wallThickness);
+        // 테두리 벽 생성
         const wallMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
+        const halfSize = mazeSize / 2;
 
-        /*
-        for (let i = 0; i < maze.length; i++) {
-            for (let j = 0; j < maze[i].length; j++) {
-                if (maze[i][j] === 1) {
-                    const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-                    wall.position.set(i * scale, wallHeight / 2, j * scale);
-                    this.scene.add(wall);
-                    this.collidableObjects.push(wall);
-                }
-            }
-        }
-        */
-       
-        const boundaryThickness = 1;
-        const boundaryHeight = 10;
-        const boundaryLength = maze.length * scale;
+        const createWall = (x, z, width, depth) => {
+            const wallGeometry = new THREE.BoxGeometry(width, wallHeight, depth);
+            const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+            wall.position.set(x, wallHeight / 2, z);
+            this.scene.add(wall);
+            this.collidableObjects.push(wall);
+        };
 
-        const boundaryGeometry = new THREE.BoxGeometry(boundaryLength, boundaryHeight, boundaryThickness);
-        const boundaryMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
-
-        const topBoundary = new THREE.Mesh(boundaryGeometry, boundaryMaterial);
-        topBoundary.position.set(boundaryLength / 2 - scale / 2, boundaryHeight / 2, -scale / 2);
-        this.scene.add(topBoundary);
-        this.collidableObjects.push(topBoundary);
-
-        const bottomBoundary = new THREE.Mesh(boundaryGeometry, boundaryMaterial);
-        bottomBoundary.position.set(boundaryLength / 2 - scale / 2, boundaryHeight / 2, maze.length * scale - scale / 2);
-        this.scene.add(bottomBoundary);
-        this.collidableObjects.push(bottomBoundary);
-
-        const sideBoundaryGeometry = new THREE.BoxGeometry(boundaryThickness, boundaryHeight, boundaryLength);
-
-        const leftBoundary = new THREE.Mesh(sideBoundaryGeometry, boundaryMaterial);
-        leftBoundary.position.set(-scale / 2, boundaryHeight / 2, boundaryLength / 2 - scale / 2);
-        this.scene.add(leftBoundary);
-        this.collidableObjects.push(leftBoundary);
-
-        const rightBoundary = new THREE.Mesh(sideBoundaryGeometry, boundaryMaterial);
-        rightBoundary.position.set(maze.length * scale - scale / 2, boundaryHeight / 2, boundaryLength / 2 - scale / 2);
-        this.scene.add(rightBoundary);
-        this.collidableObjects.push(rightBoundary);
+        // 상단 벽
+        createWall(0, -halfSize + wallThickness / 2, mazeSize, wallThickness);
+        // 하단 벽
+        createWall(0, halfSize - wallThickness / 2, mazeSize, wallThickness);
+        // 왼쪽 벽
+        createWall(-halfSize + wallThickness / 2, 0, wallThickness, mazeSize);
+        // 오른쪽 벽
+        createWall(halfSize - wallThickness / 2, 0, wallThickness, mazeSize);
 
         console.log('Maze initialized');
-    }
-
-    createPlayer() {
-        const playerStartPosition = { x: 1, y: 0.5, z: 1 }; // 시작 위치 설정 (임의의 값)
-        this.player = new Player(this.scene, this.camera, playerStartPosition);
     }
 
     onWindowResize() {
@@ -113,6 +90,7 @@ export class Game {
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
+
 
     onKeyDown(event) {
         this.keyStates[event.code] = true;
@@ -138,20 +116,15 @@ export class Game {
     update() {
         if (this.player.capsule) {
             const previousPosition = this.player.capsule.position.clone();
-            const previousRotation = this.player.capsule.rotation.clone();
-
-            let moved = false;
 
             if (this.keyStates['KeyW']) {
                 this.player.capsule.translateZ(this.speed);
-                moved = true;
                 if (this.checkCollisions()) {
                     this.player.capsule.position.copy(previousPosition);
                 }
             }
             if (this.keyStates['KeyS']) {
                 this.player.capsule.translateZ(-this.speed);
-                moved = true;
                 if (this.checkCollisions()) {
                     this.player.capsule.position.copy(previousPosition);
                 }
@@ -176,6 +149,9 @@ export class Game {
             );
 
             this.camera.lookAt(targetPosition);
+
+            // NPC 업데이트
+            this.npc.update(playerPosition);
         }
     }
 
