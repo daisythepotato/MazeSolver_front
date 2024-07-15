@@ -1,34 +1,36 @@
-export function generateMaze(width, height) {
-    const maze = new Array(height).fill(null).map(() => new Array(width).fill(1));
+import * as THREE from "https://cdn.skypack.dev/three@0.128.0";
 
-    function carvePassagesFrom(cx, cy, grid) {
-        const directions = [
-            [-1, 0], [1, 0], [0, -1], [0, 1]
-        ];
-        shuffle(directions);
+export function createBasicMaze(scene, collidableObjects, wallMaterial) {
+  const mazeSize = 50; // 미로의 크기
+  const wallHeight = 5; // 벽의 높이
+  const wallThickness = 0.5; // 벽의 두께
 
-        for (const [dx, dy] of directions) {
-            const nx = cx + dx * 2;
-            const ny = cy + dy * 2;
+  // 바닥 생성
+  const floorGeometry = new THREE.PlaneGeometry(mazeSize, mazeSize);
+  const floorMaterial = new THREE.MeshBasicMaterial({ color: 0xcccccc });
+  const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+  floor.rotation.x = -Math.PI / 2;
+  scene.add(floor);
 
-            if (ny >= 0 && ny < height && nx >= 0 && nx < width && grid[ny][nx] === 1) {
-                grid[cy + dy][cx + dx] = 0;
-                grid[ny][nx] = 0;
-                carvePassagesFrom(nx, ny, grid);
-            }
-        }
-    }
+  // 테두리 벽 생성
+  const halfSize = mazeSize / 2;
 
-    function shuffle(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-    }
+  const createWall = (x, z, width, depth) => {
+    const wallGeometry = new THREE.BoxGeometry(width, wallHeight, depth);
+    const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+    wall.position.set(x, wallHeight / 2, z);
+    scene.add(wall);
+    collidableObjects.push(wall);
+  };
 
-    maze[1][1] = 0;
-    carvePassagesFrom(1, 1, maze);
+  // 상단 벽
+  createWall(0, -halfSize + wallThickness / 2, mazeSize, wallThickness);
+  // 하단 벽
+  createWall(0, halfSize - wallThickness / 2, mazeSize, wallThickness);
+  // 왼쪽 벽
+  createWall(-halfSize + wallThickness / 2, 0, wallThickness, mazeSize);
+  // 오른쪽 벽
+  createWall(halfSize - wallThickness / 2, 0, wallThickness, mazeSize);
 
-    console.log("Generated Maze:", maze);
-    return maze;
+  console.log("Basic maze initialized");
 }
