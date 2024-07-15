@@ -7,17 +7,31 @@
     <style>
         body { margin: 0; }
         canvas { display: block; }
+        #startButton {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            font-size: 20px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <div id="gameContainer"></div>
+    <button id="startButton">Start Game</button>
     <script type="module">
         import { Game } from './js/game.js';
 
         const container = document.getElementById('gameContainer');
         const game = new Game(container);
         game.init();
-        game.animate();
+
+        document.getElementById('startButton').addEventListener('click', () => {
+            document.getElementById('startButton').style.display = 'none';
+            game.start();
+        });
     </script>
 </body>
 </html>
