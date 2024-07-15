@@ -1,3 +1,4 @@
+// checkmaze.js
 export class checkmaze {
   constructor(size) {
     this.size = size;
@@ -11,11 +12,9 @@ export class checkmaze {
   }
 
   canPlaceWall(x, z) {
-    // Temporarily place the wall
     const original = this.grid[z][x];
     this.grid[z][x] = 1;
-    const connected = this.dfs(2, 2, 48, 48);
-    // Revert the wall
+    const connected = this.dfs(2, 2, this.size - 3, this.size - 3); // 시작과 끝 좌표를 확인
     this.grid[z][x] = original;
     return connected;
   }
@@ -66,34 +65,5 @@ export class checkmaze {
 
   print() {
     console.log(this.grid.map((row) => row.join(" ")).join("\n"));
-  }
-}
-
-export class WallCreator {
-  constructor(scene, collidableObjects, wallMaterial) {
-    this.scene = scene;
-    this.collidableObjects = collidableObjects;
-    this.wallMaterial = wallMaterial;
-  }
-
-  createWallAtClick(mouse, camera, maze) {
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(this.scene.children, true);
-    if (intersects.length > 0) {
-      const point = intersects[0].point;
-      const snapX = Math.round(point.x);
-      const snapZ = Math.round(point.z);
-      if (maze.canPlaceWall(snapX, snapZ)) {
-        const wallGeometry = new THREE.BoxGeometry(1, 5, 1);
-        const wall = new THREE.Mesh(wallGeometry, this.wallMaterial);
-        wall.position.set(snapX, 2.5, snapZ);
-        this.scene.add(wall);
-        this.collidableObjects.push(wall);
-        maze.addWall(snapX, snapZ);
-      } else {
-        console.log("Cannot place wall here as it would block the path.");
-      }
-    }
   }
 }

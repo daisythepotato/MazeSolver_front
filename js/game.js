@@ -59,13 +59,8 @@ export class Game {
   }
 
   start() {
-    // 1인칭 시점으로 전환
-    //this.camera.position.set(-23, 1.5, -23);
-    //this.camera.lookAt(0, 1.5, 0);
-
     this.camera.position.set(0, 50, 0); // 위에서 내려다보는 시점
     this.camera.lookAt(0, 3.5, 0);
-    // 플레이어와 NPC 생성
     const playerInitialPosition = new THREE.Vector3(-23, 0.5, -23);
     this.player = new Player(this.scene, this.camera, playerInitialPosition);
     this.npc = new NPC(this.scene, this.collidableObjects);
@@ -109,7 +104,6 @@ export class Game {
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
     this.wallCreator.createWallAtClick(mouse, this.camera, (x, z) => {
-      // 미로 중심을 (0,0)으로 설정하고 격자 크기를 고려하여 인덱스를 계산
       const gridX = Math.floor(x + this.maze.size / 2);
       const gridZ = Math.floor(z + this.maze.size / 2);
       if (
@@ -118,8 +112,16 @@ export class Game {
         gridZ >= 0 &&
         gridZ < this.maze.size
       ) {
-        this.maze.addWall(gridX, gridZ); // 좌표 변환 후 벽 추가
-        this.maze.print(); // 현재 미로 상태 출력
+        if (this.maze.canPlaceWall(gridX, gridZ)) {
+          // 미로 검사 먼저
+          this.maze.addWall(gridX, gridZ); // 행렬에 벽 추가
+          this.wallCreator.createWall(x, z); // 실제 좌표에 블록 추가
+          this.maze.print(); // 현재 미로 상태 출력
+        } else {
+          console.log(
+            `Adding wall at (${gridX}, ${gridZ}) would block the path.`
+          );
+        }
       } else {
         console.log(`Coordinates (${gridX}, ${gridZ}) are out of bounds`);
       }
@@ -192,8 +194,6 @@ export class Game {
 
       const playerPosition = new THREE.Vector3();
       this.player.capsule.getWorldPosition(playerPosition);
-      //this.camera.position.copy(playerPosition);
-      //this.camera.position.y += 1.5;
 
       const targetPosition = new THREE.Vector3();
       targetPosition.set(
@@ -201,8 +201,6 @@ export class Game {
         playerPosition.y + 1.5,
         playerPosition.z + Math.cos(this.player.capsule.rotation.y)
       );
-
-      //this.camera.lookAt(targetPosition);
 
       this.npc.update(playerPosition);
 
