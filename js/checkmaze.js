@@ -2,6 +2,13 @@ export class checkmaze {
   constructor(size) {
     this.size = size;
     this.grid = Array.from({ length: size }, () => Array(size).fill(0));
+
+    for (let i = 0; i < size; i++) {
+      this.grid[0][i] = 1; // Top edge
+      this.grid[size - 1][i] = 1; // Bottom edge
+      this.grid[i][0] = 1; // Left edge
+      this.grid[i][size - 1] = 1; // Right edge
+    }
   }
 
   addWall(x, z) {
