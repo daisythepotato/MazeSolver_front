@@ -1,3 +1,4 @@
+// wallcreator.js
 import * as THREE from "https://cdn.skypack.dev/three@0.128.0";
 
 export class WallCreator {
@@ -15,26 +16,18 @@ export class WallCreator {
       const point = intersects[0].point;
       const snapX = Math.round(point.x);
       const snapZ = Math.round(point.z);
-      if (!this.isWallPresent(snapX, snapZ)) {
-        const wallGeometry = new THREE.BoxGeometry(1, 5, 1);
-        const wall = new THREE.Mesh(wallGeometry, this.wallMaterial);
-        wall.position.set(snapX, 2.5, snapZ);
-        this.scene.add(wall);
-        this.collidableObjects.push(wall);
-        callback(snapX, snapZ); // 콜백 함수 호출
-      }
+      callback(snapX, snapZ); // 콜백 함수 호출하여 미로 검사 및 벽 추가
     }
   }
 
   createWall(x, z) {
     const gridSize = 1; // 격자 크기
-    const snapX = Math.round(x / gridSize) * gridSize;
-    const snapZ = Math.round(z / gridSize) * gridSize;
+    const snapX = x;
+    const snapZ = z;
 
-    // 벽이 이미 있는지 확인
     if (this.isWallPresent(snapX, snapZ)) {
-      console.log(`Wall already exists at x: ${snapX}, y: ${snapZ}`);
-      return; // 이미 벽이 있으면 생성 취소
+      console.log(`Wall already exists at x: ${snapX}, z: ${snapZ}`);
+      return;
     }
 
     const wallGeometry = new THREE.BoxGeometry(gridSize, 5, gridSize);
@@ -44,16 +37,16 @@ export class WallCreator {
     this.collidableObjects.push(wall);
 
     console.log(
-      `Wall created at x: ${snapX.toFixed(2)}, y: ${snapZ.toFixed(2)}`
+      `Wall created at x: ${snapX.toFixed(2)}, z: ${snapZ.toFixed(2)}`
     );
   }
 
   isWallPresent(x, z) {
     for (let obj of this.collidableObjects) {
       if (obj.position.x === x && obj.position.z === z) {
-        return true; // 해당 위치에 벽이 이미 존재
+        return true;
       }
     }
-    return false; // 벽이 없음
+    return false;
   }
 }

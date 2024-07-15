@@ -3,231 +3,233 @@ import { Player } from "./player.js";
 import { NPC } from "./npc.js";
 import { createBasicMaze } from "./mazegenerator.js";
 import { WallCreator } from "./wallcreator.js";
-import { Compass } from "./compass.js"; // Compass 클래스 import
 import { checkmaze } from "./checkmaze.js"; // checkmaze 클래스 import
 
 export class Game {
-    constructor(container) {
-        this.container = container;
-        this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0xeeeeee);
-        this.camera = new THREE.PerspectiveCamera(
-            75,
-            window.innerWidth / window.innerHeight,
-            0.1,
-            1000
-        );
-        this.renderer = new THREE.WebGLRenderer();
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.container.appendChild(this.renderer.domElement);
+  constructor(container) {
+    this.container = container;
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0xeeeeee);
+    this.camera = new THREE.PerspectiveCamera(
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+    this.renderer = new THREE.WebGLRenderer();
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.container.appendChild(this.renderer.domElement);
 
-        this.collidableObjects = [];
-        this.wallMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
-        this.wallCreator = new WallCreator(
-            this.scene,
-            this.collidableObjects,
-            this.wallMaterial
-        );
+    this.collidableObjects = [];
+    this.wallMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
+    this.wallCreator = new WallCreator(
+      this.scene,
+      this.collidableObjects,
+      this.wallMaterial
+    );
 
-        this.player = null;
-        this.npc = null;
+    this.player = null;
+    this.npc = null;
 
-        this.keyStates = {};
-        this.speed = 0.1;
-        this.turnSpeed = 0.02;
+    this.keyStates = {};
+    this.speed = 0.1;
+    this.turnSpeed = 0.02;
 
-        this.addLights();
-        const mazeSize = 51;
-        this.maze = new checkmaze(mazeSize);
+    this.addLights();
+    const mazeSize = 51;
+    this.maze = new checkmaze(mazeSize);
 
-        this.targetPosition = new THREE.Vector3(23, 0.5, 23);
-        this.compass = new Compass(container); // Compass 생성자 호출
+    this.targetPosition = new THREE.Vector3(23, 0.5, 23);
+    this.compass = new Compass(container);
 
-        this.gameOver = false;
+    this.gameOver = false;
 
-        window.addEventListener("resize", () => this.onWindowResize(), false);
-        window.addEventListener("keydown", (event) => this.onKeyDown(event), false);
-        window.addEventListener("keyup", (event) => this.onKeyUp(event), false);
-        window.addEventListener(
-            "click",
-            (event) => this.onMouseClick(event),
-            false
-        );
-    }
+    window.addEventListener("resize", () => this.onWindowResize(), false);
+    window.addEventListener("keydown", (event) => this.onKeyDown(event), false);
+    window.addEventListener("keyup", (event) => this.onKeyUp(event), false);
+    window.addEventListener(
+      "click",
+      (event) => this.onMouseClick(event),
+      false
+    );
+  }
 
-    init() {
-        this.camera.position.set(0, 50, 0); // 위에서 내려다보는 시점
-        this.camera.lookAt(0, 1.5, 0);
-        this.addMaze();
-        this.animate();
-    }
+  init() {
+    this.camera.position.set(0, 50, 0); // 위에서 내려다보는 시점
+    this.camera.lookAt(0, 1.5, 0);
+    this.addMaze();
+    this.animate();
+  }
 
-    start() {
-        // 1인칭 시점으로 전환
-        this.camera.position.set(-25, 1.5, -25);
-        this.camera.lookAt(0, 1.5, 0);
+  start() {
+    this.camera.position.set(-25, 1.5, -25);
+    this.camera.lookAt(0, 1.5, 0);
+    const playerInitialPosition = new THREE.Vector3(-23, 0.5, -23);
+    this.player = new Player(this.scene, this.camera, playerInitialPosition);
+    this.npc = new NPC(this.scene, this.collidableObjects);
+    this.compass.show();
+    this.gameOver = false;
+  }
 
-        // 플레이어와 NPC 생성
-        const playerInitialPosition = new THREE.Vector3(-23, 0.5, -23);
-        this.player = new Player(this.scene, this.camera, playerInitialPosition);
-        this.npc = new NPC(this.scene, this.collidableObjects);
+  addLights() {
+    const light = new THREE.HemisphereLight(0xffffbb, 0x080820, 1);
+    this.scene.add(light);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    directionalLight.position.set(0, 10, 10);
+    this.scene.add(directionalLight);
+  }
 
-        // 게임 시작 시 컴퍼스를 보이게 설정
-        this.compass.show();
+  addMaze() {
+    createBasicMaze(
+      this.scene,
+      this.collidableObjects,
+      this.wallMaterial,
+      this.maze
+    );
+  }
 
-        this.gameOver = false;
-    }
+  onWindowResize() {
+    this.camera.aspect = window.innerWidth / window.innerHeight;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+  }
 
-    addLights() {
-        const light = new THREE.HemisphereLight(0xffffbb, 0x080820, 1);
-        this.scene.add(light);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-        directionalLight.position.set(0, 10, 10);
-        this.scene.add(directionalLight);
-    }
+  onKeyDown(event) {
+    this.keyStates[event.code] = true;
+  }
 
-    addMaze() {
-        createBasicMaze(
-            this.scene,
-            this.collidableObjects,
-            this.wallMaterial,
-            this.maze
-        );
-    }
+  onKeyUp(event) {
+    this.keyStates[event.code] = false;
+  }
 
-    onWindowResize() {
-        this.camera.aspect = window.innerWidth / window.innerHeight;
-        this.camera.updateProjectionMatrix();
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-    }
-
-    onKeyDown(event) {
-        this.keyStates[event.code] = true;
-    }
-
-    onKeyUp(event) {
-        this.keyStates[event.code] = false;
-    }
-
-    onMouseClick(event) {
-        const mouse = new THREE.Vector2();
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        this.wallCreator.createWallAtClick(mouse, this.camera, (x, z) => {
-            // 미로 중심을 (0,0)으로 설정하고 격자 크기를 고려하여 인덱스를 계산
-            const gridX = Math.floor(x + this.maze.size / 2);
-            const gridZ = Math.floor(z + this.maze.size / 2);
-            if (
-                gridX >= 0 &&
-                gridX < this.maze.size &&
-                gridZ >= 0 &&
-                gridZ < this.maze.size
-            ) {
-                this.maze.addWall(gridX, gridZ); // 좌표 변환 후 벽 추가
-                this.maze.print(); // 현재 미로 상태 출력
-            } else {
-                console.log(`Coordinates (${gridX}, ${gridZ}) are out of bounds`);
-            }
-        });
-    }
-
-    checkCollisions() {
-        const playerBox = new THREE.Box3().setFromObject(this.player.capsule);
-
-        for (let i = 0; i < this.collidableObjects.length; i++) {
-            const wallBox = new THREE.Box3().setFromObject(this.collidableObjects[i]);
-            if (playerBox.intersectsBox(wallBox)) {
-                console.log("Collision detected");
-                return true;
-            }
+  onMouseClick(event) {
+    const mouse = new THREE.Vector2();
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    this.wallCreator.createWallAtClick(mouse, this.camera, (x, z) => {
+      const gridX = Math.floor(x + this.maze.size / 2);
+      const gridZ = Math.floor(z + this.maze.size / 2);
+      if (
+        gridX >= 0 &&
+        gridX < this.maze.size &&
+        gridZ >= 0 &&
+        gridZ < this.maze.size
+      ) {
+        if (this.maze.canPlaceWall(gridX, gridZ)) {
+          // 미로 검사 먼저
+          this.maze.addWall(gridX, gridZ); // 행렬에 벽 추가
+          this.wallCreator.createWall(x, z); // 실제 좌표에 블록 추가
+          this.maze.print(); // 현재 미로 상태 출력
+        } else {
+          console.log(
+            `Adding wall at (${gridX}, ${gridZ}) would block the path.`
+          );
         }
-        return false;
+      } else {
+        console.log(`Coordinates (${gridX}, ${gridZ}) are out of bounds`);
+      }
+    });
+  }
+
+  checkCollisions() {
+    const playerBox = new THREE.Box3().setFromObject(this.player.capsule);
+
+    for (let i = 0; i < this.collidableObjects.length; i++) {
+      const wallBox = new THREE.Box3().setFromObject(this.collidableObjects[i]);
+      if (playerBox.intersectsBox(wallBox)) {
+        console.log("Collision detected");
+        return true;
+      }
     }
+    return false;
+  }
 
-    checkVictory() {
-        const playerPosition = new THREE.Vector3();
-        this.player.capsule.getWorldPosition(playerPosition);
-        return playerPosition.distanceTo(this.targetPosition) < 1;
-    }
+  checkVictory() {
+    // const targetPosition = new THREE.Vector3(23, 0.5, 23); // 목표 위치 설정
+    const playerPosition = new THREE.Vector3();
+    this.player.capsule.getWorldPosition(playerPosition);
+    return playerPosition.distanceTo(this.targetPosition) < 1;
+  }
 
-    checkGameOver() {
-        const playerBox = new THREE.Box3().setFromObject(this.player.capsule);
-        const npcBox = new THREE.Box3().setFromObject(this.npc.npc);
-        return playerBox.intersectsBox(npcBox);
-    }
+  checkGameOver() {
+    const playerBox = new THREE.Box3().setFromObject(this.player.capsule);
+    const npcBox = new THREE.Box3().setFromObject(this.npc.npc);
+    return playerBox.intersectsBox(npcBox);
+  }
 
-    displayEndScreen(message) {
-        const endScreen = document.createElement('div');
-        endScreen.style.position = 'absolute';
-        endScreen.style.top = '50%';
-        endScreen.style.left = '50%';
-        endScreen.style.transform = 'translate(-50%, -50%)';
-        endScreen.style.padding = '20px';
-        endScreen.style.backgroundColor = 'rgba(0, 0, 0, 0.75)';
-        endScreen.style.color = 'white';
-        endScreen.style.fontSize = '32px';
-        endScreen.style.textAlign = 'center';
-        endScreen.innerText = message;
-        document.body.appendChild(endScreen);
-    }
+  displayEndScreen(message) {
+    const endScreen = document.createElement("div");
+    endScreen.style.position = "absolute";
+    endScreen.style.top = "50%";
+    endScreen.style.left = "50%";
+    endScreen.style.transform = "translate(-50%, -50%)";
+    endScreen.style.padding = "20px";
+    endScreen.style.backgroundColor = "rgba(0, 0, 0, 0.75)";
+    endScreen.style.color = "white";
+    endScreen.style.fontSize = "32px";
+    endScreen.style.textAlign = "center";
+    endScreen.innerText = message;
+    document.body.appendChild(endScreen);
+  }
 
-    update() {
-        if (this.player && this.player.capsule && !this.gameOver) {
-            const previousPosition = this.player.capsule.position.clone();
+  update() {
+    if (this.player && this.player.capsule && !this.gameOver) {
+      const previousPosition = this.player.capsule.position.clone();
 
-            if (this.keyStates["KeyW"]) {
-                this.player.capsule.translateZ(this.speed);
-                if (this.checkCollisions()) {
-                    this.player.capsule.position.copy(previousPosition);
-                }
-            }
-            if (this.keyStates["KeyS"]) {
-                this.player.capsule.translateZ(-this.speed);
-                if (this.checkCollisions()) {
-                    this.player.capsule.position.copy(previousPosition);
-                }
-            }
-            if (this.keyStates["KeyA"]) {
-                this.player.capsule.rotation.y += this.turnSpeed;
-            }
-            if (this.keyStates["KeyD"]) {
-                this.player.capsule.rotation.y -= this.turnSpeed;
-            }
-
-            const playerPosition = new THREE.Vector3();
-            this.player.capsule.getWorldPosition(playerPosition);
-            this.camera.position.copy(playerPosition);
-            this.camera.position.y += 1.5;
-
-            const targetPosition = new THREE.Vector3();
-            targetPosition.set(
-                playerPosition.x + Math.sin(this.player.capsule.rotation.y),
-                playerPosition.y + 1.5,
-                playerPosition.z + Math.cos(this.player.capsule.rotation.y)
-            );
-
-            this.camera.lookAt(targetPosition);
-
-            this.npc.update(playerPosition);
-
-            if (this.checkVictory()) {
-                this.gameOver = true;
-                this.displayEndScreen("Victory!");
-                this.compass.hide();
-            } else if (this.checkGameOver()) {
-                this.gameOver = true;
-                this.displayEndScreen("Game Over");
-                this.compass.hide();
-            }
-
-            // 나침반 업데이트
-            this.compass.update(playerPosition, this.player.capsule.rotation, new THREE.Vector3(23, 1.5, 23)); // 도착 지점 위치
+      if (this.keyStates["KeyW"]) {
+        this.player.capsule.translateZ(this.speed);
+        if (this.checkCollisions()) {
+          this.player.capsule.position.copy(previousPosition);
         }
-    }
+      }
+      if (this.keyStates["KeyS"]) {
+        this.player.capsule.translateZ(-this.speed);
+        if (this.checkCollisions()) {
+          this.player.capsule.position.copy(previousPosition);
+        }
+      }
+      if (this.keyStates["KeyA"]) {
+        this.player.capsule.rotation.y += this.turnSpeed;
+      }
+      if (this.keyStates["KeyD"]) {
+        this.player.capsule.rotation.y -= this.turnSpeed;
+      }
 
-    animate() {
-        requestAnimationFrame(() => this.animate());
-        this.update();
-        this.renderer.render(this.scene, this.camera);
+      const playerPosition = new THREE.Vector3();
+      this.player.capsule.getWorldPosition(playerPosition);
+      this.camera.position.copy(playerPosition);
+      this.camera.position.y += 1.5;
+
+      const targetPosition = new THREE.Vector3();
+      targetPosition.set(
+        playerPosition.x + Math.sin(this.player.capsule.rotation.y),
+        playerPosition.y + 1.5,
+        playerPosition.z + Math.cos(this.player.capsule.rotation.y)
+      );
+
+      this.camera.lookAt(targetPosition);
+      this.npc.update(playerPosition);
+
+      if (this.checkVictory()) {
+        this.gameOver = true;
+        this.displayEndScreen("Victory!");
+        this.compass.hide();
+      } else if (this.checkGameOver()) {
+        this.gameOver = true;
+        this.displayEndScreen("Game Over");
+        this.compass.hide();
+      }
+      this.compass.update(
+        playerPosition,
+        this.player.capsule.rotation,
+        new THREE.Vector3(23, 1.5, 23)
+      ); // 도착 지점 위치
     }
+  }
+
+  animate() {
+    requestAnimationFrame(() => this.animate());
+    this.update();
+    this.renderer.render(this.scene, this.camera);
+  }
 }
