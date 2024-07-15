@@ -2,6 +2,7 @@ import * as THREE from "https://cdn.skypack.dev/three@0.128.0";
 import { Player } from "./player.js";
 import { NPC } from "./npc.js";
 import { createBasicMaze } from "./mazegenerator.js";
+import { WallCreator } from "./WallCreator.js";
 
 export class Game {
   constructor(container) {
@@ -19,7 +20,13 @@ export class Game {
     this.container.appendChild(this.renderer.domElement);
 
     this.collidableObjects = [];
-    this.wallMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 }); // 벽 재질 정의
+    this.wallMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
+    this.wallCreator = new WallCreator(
+      this.scene,
+      this.collidableObjects,
+      this.wallMaterial
+    );
+
     const playerInitialPosition = new THREE.Vector3(-23, 0.5, -23);
     this.player = new Player(this.scene, this.camera, playerInitialPosition);
     this.npc = new NPC(this.scene, this.collidableObjects);
@@ -56,7 +63,7 @@ export class Game {
   }
 
   addMaze() {
-    createBasicMaze(this.scene, this.collidableObjects, this.wallMaterial); // 벽 재질 전달
+    createBasicMaze(this.scene, this.collidableObjects, this.wallMaterial);
   }
 
   onWindowResize() {
@@ -77,39 +84,7 @@ export class Game {
     const mouse = new THREE.Vector2();
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(mouse, this.camera);
-
-    const intersects = raycaster.intersectObjects(this.scene.children, true);
-    if (intersects.length > 0) {
-      const point = intersects[0].point;
-
-      // 격자 크기 정의 (예: 1)
-      const gridSize = 1;
-      const snapX = Math.round(point.x / gridSize) * gridSize;
-      const snapZ = Math.round(point.z / gridSize) * gridSize;
-
-      const wallGeometry = new THREE.BoxGeometry(gridSize, 5, gridSize); // 격자 크기에 맞는 벽 크기 조정
-      const wall = new THREE.Mesh(wallGeometry, this.wallMaterial);
-      wall.position.set(snapX, 2.5, snapZ);
-      this.scene.add(wall);
-      this.collidableObjects.push(wall);
-
-      // 로깅: 생성된 벽의 위치
-      console.log(
-        `Wall created at x: ${snapX.toFixed(2)}, y: ${snapZ.toFixed(2)}`
-      );
-
-      // 플레이어의 현재 위치 로깅
-      const playerPosition = new THREE.Vector3();
-      this.player.capsule.getWorldPosition(playerPosition);
-      console.log(
-        `Player current position x: ${playerPosition.x.toFixed(
-          2
-        )}, y: ${playerPosition.z.toFixed(2)}`
-      );
-    }
+    this.wallCreator.createWallAtClick(mouse, this.camera);
   }
 
   checkCollisions() {
