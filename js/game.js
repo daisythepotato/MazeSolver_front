@@ -2,7 +2,7 @@ import * as THREE from "https://cdn.skypack.dev/three@0.128.0";
 import { Player } from "./player.js";
 import { NPC } from "./npc.js";
 import { createBasicMaze } from "./mazegenerator.js";
-import { WallCreator } from "./WallCreator.js";
+import { WallCreator } from "./wallcreator.js";
 
 export class Game {
   constructor(container) {
