@@ -39,6 +39,9 @@ export class Game {
     const mazeSize = 51;
     this.maze = new checkmaze(mazeSize);
 
+    this.targetPosition = new THREE.Vector3(23, 0.5, 23);
+    this.compass = new Compass(container);
+
     this.gameOver = false;
 
     window.addEventListener("resize", () => this.onWindowResize(), false);
@@ -59,12 +62,12 @@ export class Game {
   }
 
   start() {
-    this.camera.position.set(0, 50, 0); // 위에서 내려다보는 시점
-    this.camera.lookAt(0, 3.5, 0);
+    this.camera.position.set(-25, 1.5, -25);
+    this.camera.lookAt(0, 1.5, 0);
     const playerInitialPosition = new THREE.Vector3(-23, 0.5, -23);
     this.player = new Player(this.scene, this.camera, playerInitialPosition);
     this.npc = new NPC(this.scene, this.collidableObjects);
-
+    this.compass.show();
     this.gameOver = false;
   }
 
@@ -142,10 +145,10 @@ export class Game {
   }
 
   checkVictory() {
-    const targetPosition = new THREE.Vector3(23, 0.5, 23); // 목표 위치 설정
+    // const targetPosition = new THREE.Vector3(23, 0.5, 23); // 목표 위치 설정
     const playerPosition = new THREE.Vector3();
     this.player.capsule.getWorldPosition(playerPosition);
-    return playerPosition.distanceTo(targetPosition) < 1;
+    return playerPosition.distanceTo(this.targetPosition) < 1;
   }
 
   checkGameOver() {
@@ -194,6 +197,8 @@ export class Game {
 
       const playerPosition = new THREE.Vector3();
       this.player.capsule.getWorldPosition(playerPosition);
+      this.camera.position.copy(playerPosition);
+      this.camera.position.y += 1.5;
 
       const targetPosition = new THREE.Vector3();
       targetPosition.set(
@@ -202,15 +207,23 @@ export class Game {
         playerPosition.z + Math.cos(this.player.capsule.rotation.y)
       );
 
+      this.camera.lookAt(targetPosition);
       this.npc.update(playerPosition);
 
       if (this.checkVictory()) {
         this.gameOver = true;
         this.displayEndScreen("Victory!");
+        this.compass.hide();
       } else if (this.checkGameOver()) {
         this.gameOver = true;
         this.displayEndScreen("Game Over");
+        this.compass.hide();
       }
+      this.compass.update(
+        playerPosition,
+        this.player.capsule.rotation,
+        new THREE.Vector3(23, 1.5, 23)
+      ); // 도착 지점 위치
     }
   }
 
