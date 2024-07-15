@@ -19,6 +19,7 @@ export class Game {
     this.container.appendChild(this.renderer.domElement);
 
     this.collidableObjects = [];
+    this.wallMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 }); // 벽 재질 정의
     const playerInitialPosition = new THREE.Vector3(-23, 0.5, -23);
     this.player = new Player(this.scene, this.camera, playerInitialPosition);
     this.npc = new NPC(this.scene, this.collidableObjects);
@@ -55,7 +56,7 @@ export class Game {
   }
 
   addMaze() {
-    createBasicMaze(this.scene, this.collidableObjects);
+    createBasicMaze(this.scene, this.collidableObjects, this.wallMaterial); // 벽 재질 전달
   }
 
   onWindowResize() {
@@ -80,16 +81,29 @@ export class Game {
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, this.camera);
 
-    const intersects = raycaster.intersectObjects(this.scene.children);
+    const intersects = raycaster.intersectObjects(this.scene.children, true);
     if (intersects.length > 0) {
       const point = intersects[0].point;
 
       const wallGeometry = new THREE.BoxGeometry(0.5, 5, 0.5);
-      const wallMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
-      const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+      const wall = new THREE.Mesh(wallGeometry, this.wallMaterial);
       wall.position.set(point.x, 2.5, point.z);
       this.scene.add(wall);
       this.collidableObjects.push(wall);
+
+      // 로깅: 생성된 벽의 위치
+      console.log(
+        `Wall created at x: ${point.x.toFixed(2)}, y: ${point.z.toFixed(2)}`
+      );
+
+      // 플레이어의 현재 위치 로깅
+      const playerPosition = new THREE.Vector3();
+      this.player.capsule.getWorldPosition(playerPosition);
+      console.log(
+        `Player current position x: ${playerPosition.x.toFixed(
+          2
+        )}, y: ${playerPosition.z.toFixed(2)}`
+      );
     }
   }
 
