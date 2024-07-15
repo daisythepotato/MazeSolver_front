@@ -4,6 +4,7 @@ import { NPC } from "./npc.js";
 import { createBasicMaze } from "./mazegenerator.js";
 import { WallCreator } from "./wallcreator.js";
 import { checkmaze } from "./checkmaze.js"; // checkmaze 클래스 import
+import { Compass } from "./compass.js";
 
 export class Game {
   constructor(container) {
