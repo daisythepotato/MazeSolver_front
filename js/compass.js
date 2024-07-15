@@ -33,18 +33,7 @@ export class Compass {
     }
 
     fix_angle(angle){   //제대로 된 라디안 값으로 수정
-        let res = angle;
-        if(res >= 0 ){
-            while(res > (2 * Math.PI)){
-                res -= (2 * Math.PI);
-            }
-        }
-        else{
-            while(res < -(2 * Math.PI)){
-                res += (2 * Math.PI);
-            }
-        }
-        return res;
+        return angle % (2 * Math.PI);
     }
 
     update(playerPosition, playerRotation, targetPosition) {
