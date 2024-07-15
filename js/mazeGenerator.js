@@ -15,22 +15,53 @@ export function createBasicMaze(scene, collidableObjects, wallMaterial) {
   // 테두리 벽 생성
   const halfSize = mazeSize / 2;
 
-  const createWall = (x, z, width, depth) => {
+  const createWall = (x, z, width, depth, addToMaze) => {
     const wallGeometry = new THREE.BoxGeometry(width, wallHeight, depth);
     const wall = new THREE.Mesh(wallGeometry, wallMaterial);
     wall.position.set(x, wallHeight / 2, z);
     scene.add(wall);
     collidableObjects.push(wall);
+
+    if (addToMaze) {
+      // 벽의 위치를 격자에 추가
+      const gridX = Math.round(x + maze.size / 2);
+      const gridZ = Math.round(z + maze.size / 2);
+      const endX = gridX + Math.round(width / 2); // 가로 길이 고려
+      const endZ = gridZ + Math.round(depth / 2); // 세로 길이 고려
+      for (let i = Math.max(0, gridX); i < Math.min(maze.size, endX); i++) {
+        for (let j = Math.max(0, gridZ); j < Math.min(maze.size, endZ); j++) {
+          maze.addWall(i, j);
+        }
+      }
+    }
   };
 
-  // 상단 벽
-  createWall(0, -halfSize + wallThickness / 2, mazeSize, wallThickness);
-  // 하단 벽
-  createWall(0, halfSize - wallThickness / 2, mazeSize, wallThickness);
-  // 왼쪽 벽
-  createWall(-halfSize + wallThickness / 2, 0, wallThickness, mazeSize);
-  // 오른쪽 벽
-  createWall(halfSize - wallThickness / 2, 0, wallThickness, mazeSize);
-
+  const position = [
+    {
+      x: 0,
+      z: -halfSize + wallThickness / 2,
+      width: mazeSize,
+      depth: wallThickness,
+    },
+    {
+      x: 0,
+      z: halfSize - wallThickness / 2,
+      width: mazeSize,
+      depth: wallThickness,
+    },
+    {
+      x: -halfSize + wallThickness / 2,
+      z: 0,
+      width: wallThickness,
+      depth: mazeSize,
+    },
+    {
+      x: halfSize - wallThickness / 2,
+      z: 0,
+      width: wallThickness,
+      depth: mazeSize,
+    },
+  ];
+  position.forEach((pos) => createWall(pos.x, pos.z, pos.width, pos.depth));
   console.log("Basic maze initialized");
 }

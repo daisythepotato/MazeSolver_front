@@ -7,14 +7,22 @@ export class WallCreator {
     this.wallMaterial = wallMaterial;
   }
 
-  createWallAtClick(mouse, camera) {
+  createWallAtClick(mouse, camera, callback) {
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, camera);
-
     const intersects = raycaster.intersectObjects(this.scene.children, true);
     if (intersects.length > 0) {
       const point = intersects[0].point;
-      this.createWall(point.x, point.z);
+      const snapX = Math.round(point.x);
+      const snapZ = Math.round(point.z);
+      if (!this.isWallPresent(snapX, snapZ)) {
+        const wallGeometry = new THREE.BoxGeometry(1, 5, 1);
+        const wall = new THREE.Mesh(wallGeometry, this.wallMaterial);
+        wall.position.set(snapX, 2.5, snapZ);
+        this.scene.add(wall);
+        this.collidableObjects.push(wall);
+        callback(snapX, snapZ); // 콜백 함수 호출
+      }
     }
   }
 
