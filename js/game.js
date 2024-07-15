@@ -3,6 +3,7 @@ import { Player } from "./player.js";
 import { NPC } from "./npc.js";
 import { createBasicMaze } from "./mazegenerator.js";
 import { WallCreator } from "./wallcreator.js";
+import { Compass } from "./compass.js"; // Compass 클래스 import
 import { checkmaze } from "./checkmaze.js"; // checkmaze 클래스 import
 
 export class Game {
@@ -39,6 +40,9 @@ export class Game {
         const mazeSize = 51;
         this.maze = new checkmaze(mazeSize);
 
+        this.targetPosition = new THREE.Vector3(23, 0.5, 23);
+        this.compass = new Compass(container); // Compass 생성자 호출
+
         this.gameOver = false;
 
         window.addEventListener("resize", () => this.onWindowResize(), false);
@@ -60,15 +64,16 @@ export class Game {
 
     start() {
         // 1인칭 시점으로 전환
-        //this.camera.position.set(-23, 1.5, -23);
-        //this.camera.lookAt(0, 1.5, 0);
+        this.camera.position.set(-25, 1.5, -25);
+        this.camera.lookAt(0, 1.5, 0);
 
-        this.camera.position.set(0, 50, 0); // 위에서 내려다보는 시점
-        this.camera.lookAt(0, 3.5, 0);
         // 플레이어와 NPC 생성
         const playerInitialPosition = new THREE.Vector3(-23, 0.5, -23);
         this.player = new Player(this.scene, this.camera, playerInitialPosition);
         this.npc = new NPC(this.scene, this.collidableObjects);
+
+        // 게임 시작 시 컴퍼스를 보이게 설정
+        this.compass.show();
 
         this.gameOver = false;
     }
@@ -82,12 +87,12 @@ export class Game {
     }
 
     addMaze() {
-    createBasicMaze(
-      this.scene,
-      this.collidableObjects,
-      this.wallMaterial,
-      this.maze
-      );
+        createBasicMaze(
+            this.scene,
+            this.collidableObjects,
+            this.wallMaterial,
+            this.maze
+        );
     }
 
     onWindowResize() {
@@ -104,28 +109,27 @@ export class Game {
         this.keyStates[event.code] = false;
     }
 
-      onMouseClick(event) {
-    const mouse = new THREE.Vector2();
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    this.wallCreator.createWallAtClick(mouse, this.camera, (x, z) => {
-      // 미로 중심을 (0,0)으로 설정하고 격자 크기를 고려하여 인덱스를 계산
-      const gridX = Math.floor(x + this.maze.size / 2);
-      const gridZ = Math.floor(z + this.maze.size / 2);
-      if (
-        gridX >= 0 &&
-        gridX < this.maze.size &&
-        gridZ >= 0 &&
-        gridZ < this.maze.size
-      ) {
-        this.maze.addWall(gridX, gridZ); // 좌표 변환 후 벽 추가
-        this.maze.print(); // 현재 미로 상태 출력
-      } else {
-        console.log(`Coordinates (${gridX}, ${gridZ}) are out of bounds`);
-      }
-    });
-  }
-
+    onMouseClick(event) {
+        const mouse = new THREE.Vector2();
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        this.wallCreator.createWallAtClick(mouse, this.camera, (x, z) => {
+            // 미로 중심을 (0,0)으로 설정하고 격자 크기를 고려하여 인덱스를 계산
+            const gridX = Math.floor(x + this.maze.size / 2);
+            const gridZ = Math.floor(z + this.maze.size / 2);
+            if (
+                gridX >= 0 &&
+                gridX < this.maze.size &&
+                gridZ >= 0 &&
+                gridZ < this.maze.size
+            ) {
+                this.maze.addWall(gridX, gridZ); // 좌표 변환 후 벽 추가
+                this.maze.print(); // 현재 미로 상태 출력
+            } else {
+                console.log(`Coordinates (${gridX}, ${gridZ}) are out of bounds`);
+            }
+        });
+    }
 
     checkCollisions() {
         const playerBox = new THREE.Box3().setFromObject(this.player.capsule);
@@ -141,10 +145,9 @@ export class Game {
     }
 
     checkVictory() {
-        const targetPosition = new THREE.Vector3(23, 0.5, 23); // 목표 위치 설정
         const playerPosition = new THREE.Vector3();
         this.player.capsule.getWorldPosition(playerPosition);
-        return playerPosition.distanceTo(targetPosition) < 1;
+        return playerPosition.distanceTo(this.targetPosition) < 1;
     }
 
     checkGameOver() {
@@ -193,8 +196,8 @@ export class Game {
 
             const playerPosition = new THREE.Vector3();
             this.player.capsule.getWorldPosition(playerPosition);
-            //this.camera.position.copy(playerPosition);
-            //this.camera.position.y += 1.5;
+            this.camera.position.copy(playerPosition);
+            this.camera.position.y += 1.5;
 
             const targetPosition = new THREE.Vector3();
             targetPosition.set(
@@ -203,17 +206,22 @@ export class Game {
                 playerPosition.z + Math.cos(this.player.capsule.rotation.y)
             );
 
-            //this.camera.lookAt(targetPosition);
+            this.camera.lookAt(targetPosition);
 
             this.npc.update(playerPosition);
 
             if (this.checkVictory()) {
                 this.gameOver = true;
                 this.displayEndScreen("Victory!");
+                this.compass.hide();
             } else if (this.checkGameOver()) {
                 this.gameOver = true;
                 this.displayEndScreen("Game Over");
+                this.compass.hide();
             }
+
+            // 나침반 업데이트
+            this.compass.update(playerPosition, this.player.capsule.rotation, new THREE.Vector3(23, 1.5, 23)); // 도착 지점 위치
         }
     }
 
