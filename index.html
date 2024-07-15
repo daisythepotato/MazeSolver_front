@@ -5,13 +5,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Maze Game</title>
     <style>
-        body { margin: 0; }
+        body { margin: 0; overflow: hidden; }
         canvas { display: block; }
-        #startButton {
+        #compassContainer {
             position: absolute;
             bottom: 20px;
+            right: 20px;
+            width: 100px;
+            height: 100px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #compassCircle {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border: 2px solid black;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #compassPointer {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 20px solid black;
+        }
+        #startScreen {
+            position: absolute;
+            bottom: 20px; /* 아래쪽에 위치 */
             left: 50%;
-            transform: translateX(-50%);
+            transform: translateX(-50%); /* 중앙 정렬 */
+            z-index: 10;
+            text-align: center;
+        }
+        #startButton {
             padding: 10px 20px;
             font-size: 20px;
             cursor: pointer;
@@ -20,18 +54,21 @@
 </head>
 <body>
     <div id="gameContainer"></div>
-    <button id="startButton">Start Game</button>
+    <div id="startScreen">
+        <button id="startButton">Start Game</button>
+    </div>
     <script type="module">
         import { Game } from './js/game.js';
 
         const container = document.getElementById('gameContainer');
         const game = new Game(container);
-        game.init();
 
         document.getElementById('startButton').addEventListener('click', () => {
-            document.getElementById('startButton').style.display = 'none';
+            document.getElementById('startScreen').style.display = 'none';
             game.start();
         });
+
+        game.init();
     </script>
 </body>
 </html>

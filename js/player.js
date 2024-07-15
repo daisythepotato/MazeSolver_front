@@ -11,7 +11,7 @@ export class Player {
 
   createPlayer() {
     const radius = 0.5;
-    const widthSegments = 16;
+    const widthSegments = 5;
     const heightSegments = 16;
     const geometry = new THREE.SphereGeometry(
       radius,
