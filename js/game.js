@@ -3,6 +3,7 @@ import { Player } from "./player.js";
 import { NPC } from "./npc.js";
 import { createBasicMaze } from "./mazegenerator.js";
 import { WallCreator } from "./wallcreator.js";
+import { checkmaze } from "./checkmaze.js"; // checkmaze 클래스 import
 
 export class Game {
   constructor(container) {
@@ -30,6 +31,9 @@ export class Game {
     const playerInitialPosition = new THREE.Vector3(-23, 0.5, -23);
     this.player = new Player(this.scene, this.camera, playerInitialPosition);
     this.npc = new NPC(this.scene, this.collidableObjects);
+
+    const mazeSize = 51; // 미로의 크기를 동적으로 설정
+    this.maze = new checkmaze(mazeSize); // checkmaze 인스턴스 생성 시 크기 전달
 
     this.keyStates = {};
 
@@ -63,7 +67,12 @@ export class Game {
   }
 
   addMaze() {
-    createBasicMaze(this.scene, this.collidableObjects, this.wallMaterial);
+    createBasicMaze(
+      this.scene,
+      this.collidableObjects,
+      this.wallMaterial,
+      this.maze
+    );
   }
 
   onWindowResize() {
@@ -84,7 +93,22 @@ export class Game {
     const mouse = new THREE.Vector2();
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    this.wallCreator.createWallAtClick(mouse, this.camera);
+    this.wallCreator.createWallAtClick(mouse, this.camera, (x, z) => {
+      // 미로 중심을 (0,0)으로 설정하고 격자 크기를 고려하여 인덱스를 계산
+      const gridX = Math.floor(x + this.maze.size / 2);
+      const gridZ = Math.floor(z + this.maze.size / 2);
+      if (
+        gridX >= 0 &&
+        gridX < this.maze.size &&
+        gridZ >= 0 &&
+        gridZ < this.maze.size
+      ) {
+        this.maze.addWall(gridX, gridZ); // 좌표 변환 후 벽 추가
+        this.maze.print(); // 현재 미로 상태 출력
+      } else {
+        console.log(`Coordinates (${gridX}, ${gridZ}) are out of bounds`);
+      }
+    });
   }
 
   checkCollisions() {
