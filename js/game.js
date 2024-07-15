@@ -85,15 +85,20 @@ export class Game {
     if (intersects.length > 0) {
       const point = intersects[0].point;
 
-      const wallGeometry = new THREE.BoxGeometry(0.5, 5, 0.5);
+      // 격자 크기 정의 (예: 1)
+      const gridSize = 1;
+      const snapX = Math.round(point.x / gridSize) * gridSize;
+      const snapZ = Math.round(point.z / gridSize) * gridSize;
+
+      const wallGeometry = new THREE.BoxGeometry(gridSize, 5, gridSize); // 격자 크기에 맞는 벽 크기 조정
       const wall = new THREE.Mesh(wallGeometry, this.wallMaterial);
-      wall.position.set(point.x, 2.5, point.z);
+      wall.position.set(snapX, 2.5, snapZ);
       this.scene.add(wall);
       this.collidableObjects.push(wall);
 
       // 로깅: 생성된 벽의 위치
       console.log(
-        `Wall created at x: ${point.x.toFixed(2)}, y: ${point.z.toFixed(2)}`
+        `Wall created at x: ${snapX.toFixed(2)}, y: ${snapZ.toFixed(2)}`
       );
 
       // 플레이어의 현재 위치 로깅
