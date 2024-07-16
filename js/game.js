@@ -11,12 +11,24 @@ export class Game {
     this.container = container;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xeeeeee);
-    this.camera = new THREE.PerspectiveCamera(
+    const aspect = window.innerWidth / window.innerHeight;
+    const d = 50;
+    this.topDownCamera = new THREE.OrthographicCamera(
+      -d * aspect, d * aspect, d, -d, 1, 1000
+    );
+    this.topDownCamera.position.set(0, 30, 0);
+    this.topDownCamera.lookAt(0, 0, 0);
+    this.topDownCamera.zoom = 1;
+    this.topDownCamera.updateProjectionMatrix();
+
+    this.firstPersonCamera = new THREE.PerspectiveCamera(
       75,
       window.innerWidth / window.innerHeight,
       0.1,
       1000
     );
+
+    this.camera = this.topDownCamera;
     this.renderer = new THREE.WebGLRenderer();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.container.appendChild(this.renderer.domElement);
@@ -56,13 +68,13 @@ export class Game {
   }
 
   init() {
-    this.camera.position.set(0, 50, 0); // 위에서 내려다보는 시점
-    this.camera.lookAt(0, 1.5, 0);
+    this.camera = this.topDownCamera;
     this.addMaze();
     this.animate();
   }
 
   start() {
+    this.camera = this.firstPersonCamera;
     this.camera.position.set(-25, 1.5, -25);
     this.camera.lookAt(0, 1.5, 0);
     const playerInitialPosition = new THREE.Vector3(-23, 0.5, -23);
