@@ -22,14 +22,13 @@ var mutex = &sync.Mutex{}
 var matrix = make(map[string]bool)
 
 type Message struct {
-	X      int `json:"x"`
-	Z      int `json:"z"`
-	GridX  int `json:"gridX"`
-	GridZ  int `json:"gridZ"`
+	X      float64 `json:"x"`
+	Z      float64 `json:"z"`
+	GridX  int     `json:"gridX"`
+	GridZ  int     `json:"gridZ"`
 }
 
 func main() {
-	// 현재 디렉토리 기준으로 상위 디렉토리의 정적 파일 제공
 	absPath, _ := filepath.Abs("../")
 	log.Printf("Serving files from: %s\n", absPath)
 	fs := http.FileServer(http.Dir(absPath))
@@ -68,6 +67,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			mutex.Unlock()
 			break
 		}
+		log.Printf("Received message: %+v", msg)
 		handleBlockPlacement(msg)
 	}
 	log.Printf("Client disconnected: %v", ws.RemoteAddr())
@@ -76,6 +76,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 func handleMessages() {
 	for {
 		msg := <-broadcast
+		log.Printf("Broadcasting message: %+v", msg)
 		mutex.Lock()
 		for client := range clients {
 			go func(client *websocket.Conn) {
@@ -97,10 +98,13 @@ func handleBlockPlacement(msg Message) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
+	log.Printf("Handling block placement for message: %+v", msg)
+
 	key := fmt.Sprintf("%d:%d", msg.GridX, msg.GridZ)
 	if _, exists := matrix[key]; !exists {
 		matrix[key] = true
 		broadcast <- msg
+		log.Printf("Wall added at (%d, %d) - Coordinates: (%f, %f)", msg.GridX, msg.GridZ, msg.X, msg.Z)
 	} else {
 		log.Printf("Block already exists at (%d, %d)", msg.GridX, msg.GridZ)
 	}

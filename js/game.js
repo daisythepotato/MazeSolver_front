@@ -124,6 +124,14 @@ export class Game {
           // 서버에 블록 추가 메시지 전송
           if (this.socket) {
             this.socket.send(JSON.stringify({ x, z, gridX, gridZ }));
+            console.log(
+              `Sent message to server: ${JSON.stringify({
+                x,
+                z,
+                gridX,
+                gridZ,
+              })}`
+            );
           }
         } else {
           console.log(
@@ -244,8 +252,10 @@ export class Game {
     // 서버로부터 메시지를 수신하면 블록을 추가
     socket.addEventListener("message", (event) => {
       const data = JSON.parse(event.data);
+      console.log(`Message from server: ${event.data}`);
       this.maze.addWall(data.gridX, data.gridZ);
       this.wallCreator.createWall(data.x, data.z);
+      this.maze.print(); // 로깅 추가
     });
   }
 }
