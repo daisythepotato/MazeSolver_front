@@ -9,8 +9,9 @@ function generateSimpleMaze(size) {
             [2, 0],
             [-2, 0],
             [0, 2],
-            [0, -2],
-        ].sort(() => Math.random() - 0.5);
+            [0, -2],];
+            
+            let shuffledDirections = directions.sort(() => Math.random() - 0.5);
 
         directions.forEach(([dx, dy]) => {
             const nx = x + dx;
