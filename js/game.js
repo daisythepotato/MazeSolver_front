@@ -117,10 +117,14 @@ export class Game {
         gridZ < this.maze.size
       ) {
         if (this.maze.canPlaceWall(gridX, gridZ)) {
-          // 미로 검사 먼저
           this.maze.addWall(gridX, gridZ); // 행렬에 벽 추가
           this.wallCreator.createWall(x, z); // 실제 좌표에 블록 추가
           this.maze.print(); // 현재 미로 상태 출력
+
+          // 서버에 블록 추가 메시지 전송
+          if (this.socket) {
+            this.socket.send(JSON.stringify({ x, z, gridX, gridZ }));
+          }
         } else {
           console.log(
             `Adding wall at (${gridX}, ${gridZ}) would block the path.`
@@ -147,7 +151,6 @@ export class Game {
 
 
   checkVictory() {
-    // const targetPosition = new THREE.Vector3(23, 0.5, 23); // 목표 위치 설정
     const playerPosition = new THREE.Vector3();
     this.player.capsule.getWorldPosition(playerPosition);
     return playerPosition.distanceTo(this.targetPosition) < 1;
@@ -235,5 +238,17 @@ export class Game {
     requestAnimationFrame(() => this.animate());
     this.update();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  // 웹소켓 설정 메서드 추가
+  setSocket(socket) {
+    this.socket = socket;
+
+    // 서버로부터 메시지를 수신하면 블록을 추가
+    socket.addEventListener("message", (event) => {
+      const data = JSON.parse(event.data);
+      this.maze.addWall(data.gridX, data.gridZ);
+      this.wallCreator.createWall(data.x, data.z);
+    });
   }
 }

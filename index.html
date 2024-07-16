@@ -49,9 +49,9 @@
             padding: 10px 20px;
             font-size: 20px;
             cursor: pointer;
-        }
-    </style>
-</head>
+       }
+   </style>
+   </head>
 <body>
     <div id="gameContainer"></div>
     <div id="startScreen">
@@ -59,7 +59,6 @@
     </div>
     <script type="module">
         import { Game } from './js/game.js';
-
         const container = document.getElementById('gameContainer');
         const game = new Game(container);
 
@@ -69,6 +68,29 @@
         });
 
         game.init();
+
+        const socket = new WebSocket('ws://localhost:8000/ws');
+        
+        socket.addEventListener('open', () => {
+            console.log('WebSocket connection opened');
+        });
+
+        socket.addEventListener('error', (error) => {
+            console.error('WebSocket error:', error);
+        });
+
+        socket.addEventListener('close', () => {
+            console.log('WebSocket connection closed');
+        });
+
+        socket.addEventListener('message', (event) => {
+            console.log('Message from server:', event.data);
+            const data = JSON.parse(event.data);
+            game.maze.addWall(data.gridX, data.gridZ);
+            game.wallCreator.createWall(data.x, data.z);
+        });
+
+        game.setSocket(socket);
     </script>
 </body>
 </html>
