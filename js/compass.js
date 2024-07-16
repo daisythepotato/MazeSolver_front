@@ -42,7 +42,7 @@ export class Compass {
         const angleToTarget = Math.atan2(dz, dx);
         let tmp = this.fix_angle(playerRotation.y);
         let res = - Math.PI / 4 + tmp;
-        console.log(tmp);
+        //console.log(tmp);
         const needleAngle = playerRotation.y + Math.PI;
         this.compassNeedle.style.transform = `rotate(${res}rad)`;
     }

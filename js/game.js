@@ -1,9 +1,10 @@
 import * as THREE from "https://cdn.skypack.dev/three@0.128.0";
 import { Player } from "./player.js";
 import { NPC } from "./npc.js";
-import { createBasicMaze } from "./mazegenerator.js";
+import { createBasicMaze } from "./mazeGenerator.js";
 import { WallCreator } from "./wallcreator.js";
 import { checkmaze } from "./checkmaze.js"; // checkmaze 클래스 import
+import { Compass } from "./compass.js";
 
 export class Game {
   constructor(container) {
@@ -135,14 +136,15 @@ export class Game {
     const playerBox = new THREE.Box3().setFromObject(this.player.capsule);
 
     for (let i = 0; i < this.collidableObjects.length; i++) {
-      const wallBox = new THREE.Box3().setFromObject(this.collidableObjects[i]);
-      if (playerBox.intersectsBox(wallBox)) {
-        console.log("Collision detected");
-        return true;
-      }
+        const wallBox = new THREE.Box3().setFromObject(this.collidableObjects[i]);
+        if (playerBox.intersectsBox(wallBox)) {
+            console.log("Collision detected");
+            return true;
+        }
     }
     return false;
   }
+
 
   checkVictory() {
     // const targetPosition = new THREE.Vector3(23, 0.5, 23); // 목표 위치 설정
@@ -179,13 +181,15 @@ export class Game {
       if (this.keyStates["KeyW"]) {
         this.player.capsule.translateZ(this.speed);
         if (this.checkCollisions()) {
-          this.player.capsule.position.copy(previousPosition);
+            this.player.capsule.position.copy(previousPosition);
+            this.player.capsule.translateZ(-this.speed * 0.1); // 뒤로 약간 이동
         }
       }
       if (this.keyStates["KeyS"]) {
         this.player.capsule.translateZ(-this.speed);
         if (this.checkCollisions()) {
-          this.player.capsule.position.copy(previousPosition);
+            this.player.capsule.position.copy(previousPosition);
+            this.player.capsule.translateZ(this.speed * 0.1); // 앞으로 약간 이동
         }
       }
       if (this.keyStates["KeyA"]) {
