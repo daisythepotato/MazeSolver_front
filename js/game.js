@@ -110,32 +110,19 @@ export class Game {
     this.wallCreator.createWallAtClick(mouse, this.camera, (x, z) => {
       const gridX = Math.floor(x + this.maze.size / 2);
       const gridZ = Math.floor(z + this.maze.size / 2);
+      console.log(`Attempting to add wall at (${gridX}, ${gridZ})`);
+
       if (
         gridX >= 0 &&
         gridX < this.maze.size &&
         gridZ >= 0 &&
         gridZ < this.maze.size
       ) {
-        if (this.maze.canPlaceWall(gridX, gridZ)) {
-          this.maze.addWall(gridX, gridZ); // 행렬에 벽 추가
-          this.wallCreator.createWall(x, z); // 실제 좌표에 블록 추가
-          this.maze.print(); // 현재 미로 상태 출력
-
-          // 서버에 블록 추가 메시지 전송
-          if (this.socket) {
-            this.socket.send(JSON.stringify({ x, z, gridX, gridZ }));
-            console.log(
-              `Sent message to server: ${JSON.stringify({
-                x,
-                z,
-                gridX,
-                gridZ,
-              })}`
-            );
-          }
-        } else {
+        // 서버에 블록 추가 요청 전송
+        if (this.socket) {
+          this.socket.send(JSON.stringify({ x, z, gridX, gridZ }));
           console.log(
-            `Adding wall at (${gridX}, ${gridZ}) would block the path.`
+            `Sent message to server: ${JSON.stringify({ x, z, gridX, gridZ })}`
           );
         }
       } else {
@@ -252,10 +239,16 @@ export class Game {
     // 서버로부터 메시지를 수신하면 블록을 추가
     socket.addEventListener("message", (event) => {
       const data = JSON.parse(event.data);
-      console.log(`Message from server: ${event.data}`);
-      this.maze.addWall(data.gridX, data.gridZ);
-      this.wallCreator.createWall(data.x, data.z);
-      this.maze.print(); // 로깅 추가
+      if (data.gridX !== -1 && data.gridZ !== -1) {
+        console.log(`Message from server: ${event.data}`);
+        this.maze.addWall(data.gridX, data.gridZ);
+        this.wallCreator.createWall(data.x, data.z);
+        this.maze.print(); // 로깅 추가
+      } else {
+        console.log(
+          "Block placement failed due to path blockage or duplication."
+        );
+      }
     });
   }
 }

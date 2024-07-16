@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -20,6 +21,7 @@ var clients = make(map[*websocket.Conn]bool)
 var broadcast = make(chan Message)
 var mutex = &sync.Mutex{}
 var matrix = make(map[string]bool)
+var maze = NewCheckMaze(51) // 미로 크기를 설정
 
 type Message struct {
 	X      float64 `json:"x"`
@@ -68,7 +70,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		log.Printf("Received message: %+v", msg)
-		handleBlockPlacement(msg)
+		go handleBlockPlacement(ws, msg)
 	}
 	log.Printf("Client disconnected: %v", ws.RemoteAddr())
 }
@@ -94,18 +96,29 @@ func handleMessages() {
 	}
 }
 
-func handleBlockPlacement(msg Message) {
+func handleBlockPlacement(ws *websocket.Conn, msg Message) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
 	log.Printf("Handling block placement for message: %+v", msg)
 
+	// 1초 대기
+	time.Sleep(1 * time.Second)
+
 	key := fmt.Sprintf("%d:%d", msg.GridX, msg.GridZ)
 	if _, exists := matrix[key]; !exists {
-		matrix[key] = true
-		broadcast <- msg
-		log.Printf("Wall added at (%d, %d) - Coordinates: (%f, %f)", msg.GridX, msg.GridZ, msg.X, msg.Z)
+		if maze.addWall(msg.GridX, msg.GridZ) {
+			matrix[key] = true
+			broadcast <- msg
+			log.Printf("Wall added at (%d, %d) - Coordinates: (%f, %f)", msg.GridX, msg.GridZ, msg.X, msg.Z)
+		} else {
+			log.Printf("Adding wall at (%d, %d) would block the path", msg.GridX, msg.GridZ)
+			// 검증 실패 메시지 전송
+			ws.WriteJSON(Message{GridX: -1, GridZ: -1})
+		}
 	} else {
 		log.Printf("Block already exists at (%d, %d)", msg.GridX, msg.GridZ)
+		// 중복 메시지 전송
+		ws.WriteJSON(Message{GridX: -1, GridZ: -1})
 	}
 }
