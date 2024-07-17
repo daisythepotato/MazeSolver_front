@@ -157,7 +157,7 @@ func createRoom() *Room {
 	room := &Room{
 		id:      id,
 		clients: []*Client{},
-		maxSize: 2,
+		maxSize: 3,
 	}
 	rooms[id] = room
 	return room
