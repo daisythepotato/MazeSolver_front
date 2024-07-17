@@ -19,9 +19,10 @@ var upgrader = websocket.Upgrader{
 }
 
 type Client struct {
-	conn *websocket.Conn
-	room *Room
-	mu   sync.Mutex
+	conn     *websocket.Conn
+	room     *Room
+	clientIP string
+	mu       sync.Mutex
 }
 
 type Room struct {
@@ -81,11 +82,11 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		existingClient.conn.Close()
 		delete(clients, clientIP)
 	}
-	client := &Client{conn: ws}
+	client := &Client{conn: ws, clientIP: clientIP}
 	clients[clientIP] = client
 	clientsMu.Unlock()
 
-	log.Printf("Client connected: %v", ws.RemoteAddr())
+	log.Printf("Client connected: %v (ClientIP: %s)", ws.RemoteAddr(), clientIP)
 
 	for {
 		var msg Message
@@ -100,14 +101,14 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			clientsMu.Unlock()
 			break
 		}
-		log.Printf("Received message: %+v", msg)
+		log.Printf("Received message from %s: %+v", clientIP, msg)
 		switch msg.Type {
 		case "create_room":
 			room := createRoom()
 			client.room = room
 			room.addClient(client)
 			client.sendMessage(Message{Type: "room_created", RoomID: room.id})
-			log.Printf("Room created: %s", room.id)
+			log.Printf("Room created: %s by client %s", room.id, clientIP)
 			broadcastRoomList()
 		case "join_room":
 			roomID := msg.RoomID
@@ -116,12 +117,13 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 				client.room = room
 				room.addClient(client)
 				client.sendMessage(Message{Type: "joined_room", RoomID: roomID})
-				log.Printf("Client joined room: %s", roomID)
+				log.Printf("Client %s joined room: %s", clientIP, roomID)
 				if len(room.clients) == room.maxSize {
 					startGame(room)
 				}
 			} else {
 				client.sendMessage(Message{Type: "error", RoomID: roomID})
+				log.Printf("Client %s failed to join room: %s", clientIP, roomID)
 			}
 			broadcastRoomList()
 		case "get_rooms":
@@ -129,7 +131,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		case "placement":
 			if client.room != nil {
 				client.room.broadcast(msg)
-				log.Printf("Block placement broadcasted: %+v", msg)
+				log.Printf("Block placement broadcasted by client %s: %+v", clientIP, msg)
 			}
 		}
 	}
@@ -165,6 +167,7 @@ func (r *Room) addClient(client *Client) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.clients = append(r.clients, client)
+	log.Printf("Client %s added to room %s", client.clientIP, r.id)
 }
 
 func (r *Room) removeClient(client *Client) {
@@ -179,6 +182,7 @@ func (r *Room) removeClient(client *Client) {
 	if len(r.clients) == 0 {
 		delete(rooms, r.id)
 	}
+	log.Printf("Client %s removed from room %s", client.clientIP, r.id)
 	broadcastRoomList()
 }
 
@@ -217,6 +221,7 @@ func broadcastRoomList() {
 			client.sendMessage(Message{Type: "room_list", RoomList: roomList})
 		}
 	}
+	log.Printf("Room list broadcasted: %v", roomList)
 }
 
 func sendRoomList(ws *websocket.Conn) {
@@ -229,6 +234,7 @@ func sendRoomList(ws *websocket.Conn) {
 	}
 
 	ws.WriteJSON(Message{Type: "room_list", RoomList: roomList})
+	log.Printf("Room list sent to client: %v", roomList)
 }
 
 func startGame(room *Room) {
