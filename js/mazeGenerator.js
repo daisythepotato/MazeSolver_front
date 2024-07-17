@@ -10,7 +10,7 @@ function generateSimpleMaze(size) {
             [-2, 0],
             [0, 2],
             [0, -2],];
-            
+
             let shuffledDirections = directions.sort(() => Math.random() - 0.5);
 
         directions.forEach(([dx, dy]) => {
@@ -44,7 +44,7 @@ function generateSimpleMaze(size) {
     return maze;
 }
 
-export function createBasicMaze(scene, collidableObjects, wallMaterial, maze) {
+export function createBasicMaze(scene, collidableObjects, wallMaterial, maze, excludedPositions) {
     const mazeData = generateSimpleMaze(maze.size); // 단순한 미로 생성 데이터
     const mazeSize = maze.size; // 미로의 크기
     const wallHeight = 5; // 벽의 높이
@@ -62,7 +62,7 @@ export function createBasicMaze(scene, collidableObjects, wallMaterial, maze) {
 
     for (let z = 0; z < mazeSize; z++) {
         for (let x = 0; x < mazeSize; x++) {
-            if (mazeData[z][x] === 1) {
+            if (mazeData[z][x] === 1 && !excludedPositions.some(([ex, ey]) => ex === x && ey === z)) {
                 const wallGeometry = new THREE.BoxGeometry(1, wallHeight, 1); // 격자를 1 단위로 사용
                 const wall = new THREE.Mesh(wallGeometry, wallMaterial);
                 wall.position.set(x - halfSize, wallHeight / 2, z - halfSize); // 좌표를 변환하여 격자가 이어지도록 설정

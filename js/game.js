@@ -16,9 +16,9 @@ export class Game {
     this.topDownCamera = new THREE.OrthographicCamera(
       -d * aspect, d * aspect, d, -d, 1, 1000
     );
-    this.topDownCamera.position.set(0, 30, 0);
+    this.topDownCamera.position.set(0, 20, 0);
     this.topDownCamera.lookAt(0, 0, 0);
-    this.topDownCamera.zoom = 1;
+    this.topDownCamera.zoom = 1.5;
     this.topDownCamera.updateProjectionMatrix();
 
     this.firstPersonCamera = new THREE.PerspectiveCamera(
@@ -34,15 +34,10 @@ export class Game {
     this.container.appendChild(this.renderer.domElement);
 
     this.collidableObjects = [];
-    this.wallMaterial = new THREE.MeshBasicMaterial({ color: 0x888888 });
-    this.wallCreator = new WallCreator(
-      this.scene,
-      this.collidableObjects,
-      this.wallMaterial
-    );
+    this.wallCreator = new WallCreator(this.scene, this.collidableObjects);
 
     this.player = null;
-    this.npc = null;
+    this.npcs = [];
 
     this.keyStates = {};
     this.speed = 0.1;
@@ -52,7 +47,23 @@ export class Game {
     const mazeSize = 51;
     this.maze = new checkmaze(mazeSize);
 
-    this.targetPosition = new THREE.Vector3(23, 0.5, 23);
+    this.playerStart = { x: 25, z: 25 };
+    this.npc1Start = { x: 1, z: 1 };
+    this.npc2Start = { x: 1, z: 49 };
+    this.npc3Start = { x: 49, z: 1 };
+    this.npc4Start = { x: 49, z: 49 };
+
+    this.targetPosition = new THREE.Vector3(50 - Math.floor(mazeSize / 2), 0.5, 50 - Math.floor(mazeSize / 2));
+
+    this.excludedPositions = [
+      [this.playerStart.x, this.playerStart.z],
+      [this.npc1Start.x, this.npc1Start.z],
+      [this.npc2Start.x, this.npc2Start.z],
+      [this.npc3Start.x, this.npc3Start.z],
+      [this.npc4Start.x, this.npc4Start.z],
+      [49, 49]
+    ];
+
     this.compass = new Compass(container);
 
     this.gameOver = false;
@@ -75,11 +86,20 @@ export class Game {
 
   start() {
     this.camera = this.firstPersonCamera;
-    this.camera.position.set(-25, 1.5, -25);
-    this.camera.lookAt(0, 1.5, 0);
-    const playerInitialPosition = new THREE.Vector3(-23, 0.5, -23);
+    this.camera.position.set(25 - Math.floor(this.maze.size / 2), 0.2, 25 - Math.floor(this.maze.size / 2));
+    this.camera.lookAt(0, 1, 0);
+    const playerInitialPosition = new THREE.Vector3(25 - Math.floor(this.maze.size / 2), 0.2, 25 - Math.floor(this.maze.size / 2));
     this.player = new Player(this.scene, this.camera, playerInitialPosition);
-    this.npc = new NPC(this.scene, this.collidableObjects);
+
+    const npcPosition1 = new THREE.Vector3(-24, 0.5, -24);
+     const npcPosition2 = new THREE.Vector3(-24, 0.5, 24);
+     const npcPosition3 = new THREE.Vector3(24, 0.5, -24);
+     const npcPosition4 = new THREE.Vector3(24, 0.5, 24);
+
+     this.npcs.push(new NPC(this.scene, this.collidableObjects, npcPosition1));
+     this.npcs.push(new NPC(this.scene, this.collidableObjects, npcPosition2));
+     this.npcs.push(new NPC(this.scene, this.collidableObjects, npcPosition3));
+     this.npcs.push(new NPC(this.scene, this.collidableObjects, npcPosition4));
     this.compass.show();
     this.gameOver = false;
   }
@@ -92,12 +112,14 @@ export class Game {
     this.scene.add(directionalLight);
   }
 
-  addMaze() {
+  async addMaze() {
+    await this.wallCreator.textureLoaded;
     createBasicMaze(
       this.scene,
       this.collidableObjects,
-      this.wallMaterial,
-      this.maze
+      this.wallCreator.wallMaterial,
+      this.maze,
+      this.excludedPositions // 추가
     );
   }
 
@@ -119,7 +141,7 @@ export class Game {
     const mouse = new THREE.Vector2();
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    this.wallCreator.createWallAtClick(mouse, this.camera, (x, z) => {
+    this.wallCreator.createWallAtClick(mouse, this.camera, async (x, z) => {
       const gridX = Math.floor(x + this.maze.size / 2);
       const gridZ = Math.floor(z + this.maze.size / 2);
       console.log(`Attempting to add wall at (${gridX}, ${gridZ})`);
@@ -128,13 +150,21 @@ export class Game {
         gridX >= 0 &&
         gridX < this.maze.size &&
         gridZ >= 0 &&
-        gridZ < this.maze.size
+        gridZ < this.maze.size &&
+        !this.excludedPositions.some(([ex, ey]) => ex === gridX && ey === gridZ) // 예외 위치 확인
       ) {
-        // 서버에 블록 추가 요청 전송
-        if (this.socket) {
-          this.socket.send(JSON.stringify({ x, z, gridX, gridZ }));
+        if (this.maze.canPlaceWall(gridX, gridZ)) {
+          this.maze.addWall(gridX, gridZ); // 행렬에 벽 추가
+          this.wallCreator.createWall(x, z); // 실제 좌표에 블록 추가
+          this.maze.print(); // 현재 미로 상태 출력
+
+          // 서버에 블록 추가 메시지 전송
+          if (this.socket) {
+            this.socket.send(JSON.stringify({ x, z, gridX, gridZ }));
+          }
+        } else {
           console.log(
-            `Sent message to server: ${JSON.stringify({ x, z, gridX, gridZ })}`
+            `Adding wall at (${gridX}, ${gridZ}) would block the path.`
           );
         }
       } else {
@@ -143,19 +173,19 @@ export class Game {
     });
   }
 
+
   checkCollisions() {
     const playerBox = new THREE.Box3().setFromObject(this.player.capsule);
 
     for (let i = 0; i < this.collidableObjects.length; i++) {
-        const wallBox = new THREE.Box3().setFromObject(this.collidableObjects[i]);
-        if (playerBox.intersectsBox(wallBox)) {
-            console.log("Collision detected");
-            return true;
-        }
+      const wallBox = new THREE.Box3().setFromObject(this.collidableObjects[i]);
+      if (playerBox.intersectsBox(wallBox)) {
+        console.log("Collision detected");
+        return true;
+      }
     }
     return false;
   }
-
 
   checkVictory() {
     const playerPosition = new THREE.Vector3();
@@ -165,8 +195,13 @@ export class Game {
 
   checkGameOver() {
     const playerBox = new THREE.Box3().setFromObject(this.player.capsule);
-    const npcBox = new THREE.Box3().setFromObject(this.npc.npc);
-    return playerBox.intersectsBox(npcBox);
+    for (let npc of this.npcs) {
+      const npcBox = new THREE.Box3().setFromObject(npc.npc);
+      if (playerBox.intersectsBox(npcBox)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   displayEndScreen(message) {
@@ -191,15 +226,15 @@ export class Game {
       if (this.keyStates["KeyW"]) {
         this.player.capsule.translateZ(this.speed);
         if (this.checkCollisions()) {
-            this.player.capsule.position.copy(previousPosition);
-            this.player.capsule.translateZ(-this.speed * 0.1); // 뒤로 약간 이동
+          this.player.capsule.position.copy(previousPosition);
+          this.player.capsule.translateZ(-this.speed * 0.1); // 뒤로 약간 이동
         }
       }
       if (this.keyStates["KeyS"]) {
         this.player.capsule.translateZ(-this.speed);
         if (this.checkCollisions()) {
-            this.player.capsule.position.copy(previousPosition);
-            this.player.capsule.translateZ(this.speed * 0.1); // 앞으로 약간 이동
+          this.player.capsule.position.copy(previousPosition);
+          this.player.capsule.translateZ(this.speed * 0.1); // 앞으로 약간 이동
         }
       }
       if (this.keyStates["KeyA"]) {
@@ -222,7 +257,9 @@ export class Game {
       );
 
       this.camera.lookAt(targetPosition);
-      this.npc.update(playerPosition);
+      for (let npc of this.npcs) {
+        npc.update(playerPosition);
+      }
 
       if (this.checkVictory()) {
         this.gameOver = true;
@@ -252,12 +289,12 @@ export class Game {
     this.socket = socket;
 
     // 서버로부터 메시지를 수신하면 블록을 추가
-    socket.addEventListener("message", (event) => {
+    socket.addEventListener("message", async (event) => {
       const data = JSON.parse(event.data);
       if (data.gridX !== -1 && data.gridZ !== -1) {
         console.log(`Message from server: ${event.data}`);
         this.maze.addWall(data.gridX, data.gridZ);
-        this.wallCreator.createWall(data.x, data.z);
+        await this.wallCreator.createWall(data.x, data.z);
         this.maze.print(); // 로깅 추가
       } else {
         console.log(
