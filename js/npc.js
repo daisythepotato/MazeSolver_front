@@ -1,14 +1,14 @@
 import * as THREE from "https://cdn.skypack.dev/three@0.128.0";
 
 export class NPC {
-  constructor(scene, collidableObjects) {
+  constructor(scene, collidableObjects, position = new THREE.Vector3(0, 0, 0)) {
     this.scene = scene;
     this.collidableObjects = collidableObjects;
-    this.npc = this.createNPC();
+    this.npc = this.createNPC(position);
     this.scene.add(this.npc);
   }
 
-  createNPC() {
+  createNPC(position) {
     const radius = 0.5;
     const widthSegments = 16;
     const heightSegments = 16;
@@ -19,7 +19,8 @@ export class NPC {
     );
     const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
     const sphere = new THREE.Mesh(geometry, material);
-    sphere.position.set(0, radius, 0); // 초기 위치 설정
+    sphere.scale.set(0.5, 0.5, 0.5);
+    sphere.position.copy(position); // 초기 위치 설정
     return sphere;
   }
 
