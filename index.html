@@ -39,58 +39,73 @@
         }
         #startScreen {
             position: absolute;
-            bottom: 20px; /* 아래쪽에 위치 */
+            top: 20px;
             left: 50%;
-            transform: translateX(-50%); /* 중앙 정렬 */
+            transform: translateX(-50%);
             z-index: 10;
             text-align: center;
         }
-        #startButton {
+        #createRoomButton {
             padding: 10px 20px;
             font-size: 20px;
             cursor: pointer;
-       }
-   </style>
-   </head>
+        }
+        #roomList {
+            margin-top: 10px;
+        }
+        #roomList div {
+            padding: 10px;
+            cursor: pointer;
+            background-color: #ddd;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
 <body>
     <div id="gameContainer"></div>
     <div id="startScreen">
-        <button id="startButton">Start Game</button>
+        <button id="createRoomButton">Create Room</button>
+        <div id="roomList"></div>
     </div>
     <script type="module">
         import { Game } from './js/game.js';
         const container = document.getElementById('gameContainer');
         const game = new Game(container);
 
-        document.getElementById('startButton').addEventListener('click', () => {
-            document.getElementById('startScreen').style.display = 'none';
-            game.start();
-        });
-
         game.init();
 
-        const socket = new WebSocket('ws://localhost:8000/ws');
-        
-        socket.addEventListener('open', () => {
-            console.log('WebSocket connection opened');
-        });
+        // WebSocket을 한 번만 연결하도록 설정
+        if (!window.hasInitializedSocket) {
+            window.hasInitializedSocket = true;
 
-        socket.addEventListener('error', (error) => {
-            console.error('WebSocket error:', error);
-        });
+            const socket = new WebSocket('ws://localhost:8000/ws');
+            
+            socket.addEventListener('open', () => {
+                console.log('WebSocket connection opened');
+                socket.send(JSON.stringify({ type: 'get_rooms' }));
+            });
 
-        socket.addEventListener('close', () => {
-            console.log('WebSocket connection closed');
-        });
+            socket.addEventListener('error', (error) => {
+                console.error('WebSocket error:', error);
+            });
 
-        socket.addEventListener('message', (event) => {
-            console.log('Message from server:', event.data);
-            const data = JSON.parse(event.data);
-            game.maze.addWall(data.gridX, data.gridZ);
-            game.wallCreator.createWall(data.x, data.z);
-        });
+            socket.addEventListener('close', () => {
+                console.log('WebSocket connection closed');
+            });
 
-        game.setSocket(socket);
+            socket.addEventListener('message', (event) => {
+                console.log('Message from server:', event.data);
+                const data = JSON.parse(event.data);
+                game.handleServerMessage(data);
+            });
+
+            game.setSocket(socket);
+
+            document.getElementById('createRoomButton').addEventListener('click', () => {
+                socket.send(JSON.stringify({ type: 'create_room' }));
+            });
+        }
     </script>
 </body>
 </html>

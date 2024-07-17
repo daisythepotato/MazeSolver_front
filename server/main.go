@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -16,17 +18,39 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-var clients = make(map[*websocket.Conn]bool)
-var broadcast = make(chan Message)
-var matrix = make(map[string]bool)
-var maze = NewCheckMaze(51) // 미로 크기를 설정
-var placementQueue = make(chan Message)
+type Client struct {
+	conn     *websocket.Conn
+	room     *Room
+	clientIP string
+	mu       sync.Mutex
+}
+
+type Room struct {
+	id       string
+	clients  []*Client
+	mu       sync.Mutex
+	maxSize  int
+	gameData *GameData
+}
+
+type GameData struct {
+	matrix map[string]bool
+	maze   *CheckMaze
+}
+
+var rooms = make(map[string]*Room)
+var roomMu sync.Mutex
+var clients = make(map[string]*Client)
+var clientsMu sync.Mutex
 
 type Message struct {
-	X      float64 `json:"x"`
-	Z      float64 `json:"z"`
-	GridX  int     `json:"gridX"`
-	GridZ  int     `json:"gridZ"`
+	Type     string   `json:"type"`
+	RoomID   string   `json:"roomID,omitempty"`
+	RoomList []string `json:"roomList,omitempty"`
+	X        float64  `json:"x,omitempty"`
+	Z        float64  `json:"z,omitempty"`
+	GridX    int      `json:"gridX,omitempty"`
+	GridZ    int      `json:"gridZ,omitempty"`
 }
 
 func main() {
@@ -36,8 +60,7 @@ func main() {
 	http.Handle("/", fs)
 	http.HandleFunc("/ws", handleConnections)
 
-	go handleMessages()
-	go processPlacements()
+	go broadcastRoomList()
 
 	log.Println("HTTP server started on :8000")
 	err := http.ListenAndServe(":8000", nil)
@@ -53,65 +76,176 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ws.Close()
 
-	clients[ws] = true
-	log.Printf("Client connected: %v", ws.RemoteAddr())
+	clientIP := getClientIP(r)
+	clientsMu.Lock()
+	if existingClient, exists := clients[clientIP]; exists {
+		existingClient.conn.Close()
+		delete(clients, clientIP)
+	}
+	client := &Client{conn: ws, clientIP: clientIP}
+	clients[clientIP] = client
+	clientsMu.Unlock()
+
+	log.Printf("Client connected: %v (ClientIP: %s)", ws.RemoteAddr(), clientIP)
 
 	for {
 		var msg Message
 		err := ws.ReadJSON(&msg)
 		if err != nil {
 			log.Printf("error: %v", err)
-			delete(clients, ws)
+			if client.room != nil {
+				client.room.removeClient(client)
+			}
+			clientsMu.Lock()
+			delete(clients, clientIP)
+			clientsMu.Unlock()
 			break
 		}
-		log.Printf("Received message: %+v", msg)
-		placementQueue <- msg
-	}
-	log.Printf("Client disconnected: %v", ws.RemoteAddr())
-}
-
-func handleMessages() {
-	for msg := range broadcast {
-		log.Printf("Broadcasting message: %+v", msg)
-		for client := range clients {
-			go func(client *websocket.Conn) {
-				err := client.WriteJSON(msg)
-				if err != nil {
-					log.Printf("error: %v", err)
-					client.Close()
-					delete(clients, client)
+		log.Printf("Received message from %s: %+v", clientIP, msg)
+		switch msg.Type {
+		case "create_room":
+			room := createRoom()
+			client.room = room
+			room.addClient(client)
+			client.sendMessage(Message{Type: "room_created", RoomID: room.id})
+			log.Printf("Room created: %s by client %s", room.id, clientIP)
+			broadcastRoomList()
+		case "join_room":
+			roomID := msg.RoomID
+			room, exists := rooms[roomID]
+			if exists && len(room.clients) < room.maxSize {
+				client.room = room
+				room.addClient(client)
+				client.sendMessage(Message{Type: "joined_room", RoomID: roomID})
+				log.Printf("Client %s joined room: %s", clientIP, roomID)
+				if len(room.clients) == room.maxSize {
+					startGame(room)
 				}
-			}(client)
+			} else {
+				client.sendMessage(Message{Type: "error", RoomID: roomID})
+				log.Printf("Client %s failed to join room: %s", clientIP, roomID)
+			}
+			broadcastRoomList()
+		case "get_rooms":
+			sendRoomList(ws)
+		case "placement":
+			if client.room != nil {
+				client.room.broadcast(msg)
+				log.Printf("Block placement broadcasted by client %s: %+v", clientIP, msg)
+			}
 		}
 	}
 }
 
-func processPlacements() {
-	for msg := range placementQueue {
-		handleBlockPlacement(msg)
+func getClientIP(r *http.Request) string {
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return ""
+	}
+	userIP := net.ParseIP(ip)
+	if userIP == nil {
+		return ""
+	}
+	return userIP.String()
+}
+
+func createRoom() *Room {
+	roomMu.Lock()
+	defer roomMu.Unlock()
+
+	id := fmt.Sprintf("room-%d", len(rooms)+1)
+	room := &Room{
+		id:      id,
+		clients: []*Client{},
+		maxSize: 3,
+	}
+	rooms[id] = room
+	return room
+}
+
+func (r *Room) addClient(client *Client) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.clients = append(r.clients, client)
+	log.Printf("Client %s added to room %s", client.clientIP, r.id)
+}
+
+func (r *Room) removeClient(client *Client) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, c := range r.clients {
+		if c == client {
+			r.clients = append(r.clients[:i], r.clients[i+1:]...)
+			break
+		}
+	}
+	if len(r.clients) == 0 {
+		delete(rooms, r.id)
+	}
+	log.Printf("Client %s removed from room %s", client.clientIP, r.id)
+	broadcastRoomList()
+}
+
+func (r *Room) broadcast(msg Message) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, client := range r.clients {
+		client.sendMessage(msg)
 	}
 }
 
-func handleBlockPlacement(msg Message) {
-	log.Printf("Handling block placement for message: %+v", msg)
-
-	// 1초 대기
-	time.Sleep(1 * time.Second)
-
-	key := fmt.Sprintf("%d:%d", msg.GridX, msg.GridZ)
-	if _, exists := matrix[key]; !exists {
-		if maze.addWall(msg.GridX, msg.GridZ) {
-			matrix[key] = true
-			broadcast <- msg
-			log.Printf("Wall added at (%d, %d) - Coordinates: (%f, %f)", msg.GridX, msg.GridZ, msg.X, msg.Z)
-		} else {
-			log.Printf("Adding wall at (%d, %d) would block the path", msg.GridX, msg.GridZ)
-			// 검증 실패 메시지 전송
-			broadcast <- Message{X: msg.X, Z: msg.Z, GridX: -1, GridZ: -1}
+func (c *Client) sendMessage(msg Message) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	err := c.conn.WriteJSON(msg)
+	if err != nil {
+		log.Printf("error: %v", err)
+		c.conn.Close()
+		if c.room != nil {
+			c.room.removeClient(c)
 		}
-	} else {
-		log.Printf("Block already exists at (%d, %d)", msg.GridX, msg.GridZ)
-		// 중복 메시지 전송
-		broadcast <- Message{X: msg.X, Z: msg.Z, GridX: -1, GridZ: -1}
 	}
+}
+
+func broadcastRoomList() {
+	roomMu.Lock()
+	defer roomMu.Unlock()
+
+	roomList := []string{}
+	for id := range rooms {
+		roomList = append(roomList, id)
+	}
+
+	for _, room := range rooms {
+		for _, client := range room.clients {
+			client.sendMessage(Message{Type: "room_list", RoomList: roomList})
+		}
+	}
+	log.Printf("Room list broadcasted: %v", roomList)
+}
+
+func sendRoomList(ws *websocket.Conn) {
+	roomMu.Lock()
+	defer roomMu.Unlock()
+
+	roomList := []string{}
+	for id := range rooms {
+		roomList = append(roomList, id)
+	}
+
+	ws.WriteJSON(Message{Type: "room_list", RoomList: roomList})
+	log.Printf("Room list sent to client: %v", roomList)
+}
+
+func startGame(room *Room) {
+	room.gameData = &GameData{
+		matrix: make(map[string]bool),
+		maze:   NewCheckMaze(51),
+	}
+
+	go func() {
+		time.Sleep(5 * time.Second)
+		room.broadcast(Message{Type: "start_game"})
+		log.Printf("Game started in room: %s", room.id)
+	}()
 }

@@ -14,7 +14,12 @@ export class Game {
     const aspect = window.innerWidth / window.innerHeight;
     const d = 50;
     this.topDownCamera = new THREE.OrthographicCamera(
-      -d * aspect, d * aspect, d, -d, 1, 1000
+      -d * aspect,
+      d * aspect,
+      d,
+      -d,
+      1,
+      1000
     );
     this.topDownCamera.position.set(0, 20, 0);
     this.topDownCamera.lookAt(0, 0, 0);
@@ -44,8 +49,7 @@ export class Game {
     this.turnSpeed = 0.02;
 
     this.addLights();
-    const mazeSize = 51;
-    this.maze = new checkmaze(mazeSize);
+    this.maze = null;
 
     this.playerStart = { x: 25, z: 25 };
     this.npc1Start = { x: 1, z: 1 };
@@ -76,15 +80,17 @@ export class Game {
       (event) => this.onMouseClick(event),
       false
     );
+
+    this.socket = null; // Add this line
   }
 
   init() {
     this.camera = this.topDownCamera;
-    this.addMaze();
     this.animate();
   }
 
   start() {
+    this.maze = new checkmaze(51);
     this.camera = this.firstPersonCamera;
     this.camera.position.set(25 - Math.floor(this.maze.size / 2), 0.2, 25 - Math.floor(this.maze.size / 2));
     this.camera.lookAt(0, 1, 0);
@@ -101,7 +107,9 @@ export class Game {
      this.npcs.push(new NPC(this.scene, this.collidableObjects, npcPosition3));
      this.npcs.push(new NPC(this.scene, this.collidableObjects, npcPosition4));
     this.compass.show();
+    this.addMaze();
     this.gameOver = false;
+    console.log("Game started");
   }
 
   addLights() {
@@ -111,6 +119,7 @@ export class Game {
     directionalLight.position.set(0, 10, 10);
     this.scene.add(directionalLight);
   }
+
 
   async addMaze() {
     await this.wallCreator.textureLoaded;
@@ -153,16 +162,17 @@ export class Game {
         gridZ < this.maze.size &&
         !this.excludedPositions.some(([ex, ey]) => ex === gridX && ey === gridZ) // 예외 위치 확인
       ) {
-        if (this.maze.canPlaceWall(gridX, gridZ)) {
-          this.maze.addWall(gridX, gridZ); // 행렬에 벽 추가
-          this.wallCreator.createWall(x, z); // 실제 좌표에 블록 추가
-          this.maze.print(); // 현재 미로 상태 출력
+if (this.maze.canPlaceWall(gridX, gridZ)) {
+  this.maze.addWall(gridX, gridZ); // 행렬에 벽 추가
+  this.wallCreator.createWall(x, z); // 실제 좌표에 블록 추가
+  this.maze.print(); // 현재 미로 상태 출력
 
-          // 서버에 블록 추가 메시지 전송
-          if (this.socket) {
-            this.socket.send(JSON.stringify({ x, z, gridX, gridZ }));
-          }
-        } else {
+  if (this.socket) {
+    this.socket.send(
+      JSON.stringify({ type: "placement", x, z, gridX, gridZ })
+    );
+  }
+} else {
           console.log(
             `Adding wall at (${gridX}, ${gridZ}) would block the path.`
           );
@@ -286,12 +296,16 @@ export class Game {
 
   // 웹소켓 설정 메서드 추가
   setSocket(socket) {
+    if (this.socket) {
+      console.log("WebSocket is already connected.");
+      return;
+    }
     this.socket = socket;
 
     // 서버로부터 메시지를 수신하면 블록을 추가
     socket.addEventListener("message", async (event) => {
       const data = JSON.parse(event.data);
-      if (data.gridX !== -1 && data.gridZ !== -1) {
+      if (data.type === "placement" && data.gridX !== -1 && data.gridZ !== -1) {
         console.log(`Message from server: ${event.data}`);
         this.maze.addWall(data.gridX, data.gridZ);
         await this.wallCreator.createWall(data.x, data.z);
@@ -303,4 +317,87 @@ export class Game {
       }
     });
   }
+
+  handleServerMessage(data) {
+    switch (data.type) {
+      case "placement":
+        if (data.gridX !== -1 && data.gridZ !== -1) {
+          console.log(`Message from server: ${JSON.stringify(data)}`);
+          this.maze.addWall(data.gridX, data.gridZ);
+          this.wallCreator.createWall(data.x, data.z);
+          this.maze.print(); // 로깅 추가
+        } else {
+          console.log(
+            "Block placement failed due to path blockage or duplication."
+          );
+        }
+        break;
+      case "start_game":
+        this.start();
+        break;
+      case "room_list":
+        this.updateRoomList(data.roomList);
+        break;
+      case "joined_room":
+        console.log(`Joined room: ${data.roomID}`);
+        document.getElementById("startScreen").style.display = "none";
+        break;
+      case "room_created":
+        console.log(`Room created: ${data.roomID}`);
+        break;
+      case "error":
+        console.error(`Error: ${data.roomID}`);
+        break;
+      default:
+        console.log("Unknown message type:", data.type);
+        break;
+    }
+  }
+
+  updateRoomList(roomList) {
+    const roomListContainer = document.getElementById("roomList");
+    roomListContainer.innerHTML = "";
+    if (Array.isArray(roomList)) {
+      roomList.forEach((roomID) => {
+        const roomElement = document.createElement("div");
+        roomElement.innerText = roomID;
+        roomElement.addEventListener("click", () => {
+          this.socket.send(JSON.stringify({ type: "join_room", roomID }));
+        });
+        roomListContainer.appendChild(roomElement);
+      });
+    }
+  }
 }
+
+const container = document.getElementById("gameContainer");
+const game = new Game(container);
+
+game.init();
+
+const socket = new WebSocket("ws://localhost:8000/ws");
+
+socket.addEventListener("open", () => {
+  console.log("WebSocket connection opened");
+  socket.send(JSON.stringify({ type: "get_rooms" }));
+});
+
+socket.addEventListener("error", (error) => {
+  console.error("WebSocket error:", error);
+});
+
+socket.addEventListener("close", () => {
+  console.log("WebSocket connection closed");
+});
+
+socket.addEventListener("message", (event) => {
+  console.log("Message from server:", event.data);
+  const data = JSON.parse(event.data);
+  game.handleServerMessage(data);
+});
+
+game.setSocket(socket);
+
+document.getElementById("createRoomButton").addEventListener("click", () => {
+  socket.send(JSON.stringify({ type: "create_room" }));
+});
