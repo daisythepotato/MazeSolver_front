@@ -14,7 +14,12 @@ export class Game {
     const aspect = window.innerWidth / window.innerHeight;
     const d = 50;
     this.topDownCamera = new THREE.OrthographicCamera(
-      -d * aspect, d * aspect, d, -d, 1, 1000
+      -d * aspect,
+      d * aspect,
+      d,
+      -d,
+      1,
+      1000
     );
     this.topDownCamera.position.set(0, 30, 0);
     this.topDownCamera.lookAt(0, 0, 0);
@@ -130,11 +135,18 @@ export class Game {
         gridZ >= 0 &&
         gridZ < this.maze.size
       ) {
-        // 서버에 블록 추가 요청 전송
-        if (this.socket) {
-          this.socket.send(JSON.stringify({ x, z, gridX, gridZ }));
+        if (this.maze.canPlaceWall(gridX, gridZ)) {
+          this.maze.addWall(gridX, gridZ); // 행렬에 벽 추가
+          this.wallCreator.createWall(x, z); // 실제 좌표에 블록 추가
+          this.maze.print(); // 현재 미로 상태 출력
+
+          // 서버에 블록 추가 메시지 전송
+          if (this.socket) {
+            this.socket.send(JSON.stringify({ x, z, gridX, gridZ }));
+          }
+        } else {
           console.log(
-            `Sent message to server: ${JSON.stringify({ x, z, gridX, gridZ })}`
+            `Adding wall at (${gridX}, ${gridZ}) would block the path.`
           );
         }
       } else {
@@ -147,15 +159,14 @@ export class Game {
     const playerBox = new THREE.Box3().setFromObject(this.player.capsule);
 
     for (let i = 0; i < this.collidableObjects.length; i++) {
-        const wallBox = new THREE.Box3().setFromObject(this.collidableObjects[i]);
-        if (playerBox.intersectsBox(wallBox)) {
-            console.log("Collision detected");
-            return true;
-        }
+      const wallBox = new THREE.Box3().setFromObject(this.collidableObjects[i]);
+      if (playerBox.intersectsBox(wallBox)) {
+        console.log("Collision detected");
+        return true;
+      }
     }
     return false;
   }
-
 
   checkVictory() {
     const playerPosition = new THREE.Vector3();
@@ -191,15 +202,15 @@ export class Game {
       if (this.keyStates["KeyW"]) {
         this.player.capsule.translateZ(this.speed);
         if (this.checkCollisions()) {
-            this.player.capsule.position.copy(previousPosition);
-            this.player.capsule.translateZ(-this.speed * 0.1); // 뒤로 약간 이동
+          this.player.capsule.position.copy(previousPosition);
+          this.player.capsule.translateZ(-this.speed * 0.1); // 뒤로 약간 이동
         }
       }
       if (this.keyStates["KeyS"]) {
         this.player.capsule.translateZ(-this.speed);
         if (this.checkCollisions()) {
-            this.player.capsule.position.copy(previousPosition);
-            this.player.capsule.translateZ(this.speed * 0.1); // 앞으로 약간 이동
+          this.player.capsule.position.copy(previousPosition);
+          this.player.capsule.translateZ(this.speed * 0.1); // 앞으로 약간 이동
         }
       }
       if (this.keyStates["KeyA"]) {
