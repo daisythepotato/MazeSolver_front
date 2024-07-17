@@ -1,11 +1,25 @@
-// wallcreator.js
 import * as THREE from "https://cdn.skypack.dev/three@0.128.0";
 
 export class WallCreator {
-  constructor(scene, collidableObjects, wallMaterial) {
+  constructor(scene, collidableObjects) {
     this.scene = scene;
     this.collidableObjects = collidableObjects;
-    this.wallMaterial = wallMaterial;
+    this.wallMaterial = null;
+
+    // 텍스처 로드
+    this.textureLoaded = new Promise((resolve, reject) => {
+      const textureLoader = new THREE.TextureLoader();
+      textureLoader.load('http://localhost:8000/models/Concrete042D_4K_Color.jpg', (texture) => {
+        // 텍스처 로드가 완료되면 설정
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(1, 1); // 텍스처를 4x4 배 반복
+
+        // 재질 생성
+        this.wallMaterial = new THREE.MeshBasicMaterial({ map: texture });
+        resolve();
+      }, undefined, reject);
+    });
   }
 
   createWallAtClick(mouse, camera, callback) {
@@ -20,7 +34,9 @@ export class WallCreator {
     }
   }
 
-  createWall(x, z) {
+  async createWall(x, z) {
+    await this.textureLoaded;
+
     const gridSize = 1; // 격자 크기
     const snapX = x;
     const snapZ = z;
