@@ -57,7 +57,8 @@ export class Game {
     this.npc3Start = { x: 49, z: 1 };
     this.npc4Start = { x: 49, z: 49 };
 
-    this.targetPosition = new THREE.Vector3(50 - Math.floor(mazeSize / 2), 0.5, 50 - Math.floor(mazeSize / 2));
+    // this.targetPosition 수정
+    this.targetPosition = new THREE.Vector3(25, 0.5, 25);
 
     this.excludedPositions = [
       [this.playerStart.x, this.playerStart.z],
@@ -65,7 +66,7 @@ export class Game {
       [this.npc2Start.x, this.npc2Start.z],
       [this.npc3Start.x, this.npc3Start.z],
       [this.npc4Start.x, this.npc4Start.z],
-      [49, 49]
+      [49, 49],
     ];
 
     this.compass = new Compass(container);
@@ -81,7 +82,7 @@ export class Game {
       false
     );
 
-    this.socket = null; // Add this line
+    this.socket = null;
   }
 
   init() {
@@ -92,20 +93,28 @@ export class Game {
   start() {
     this.maze = new checkmaze(51);
     this.camera = this.firstPersonCamera;
-    this.camera.position.set(25 - Math.floor(this.maze.size / 2), 0.2, 25 - Math.floor(this.maze.size / 2));
+    this.camera.position.set(
+      25 - Math.floor(this.maze.size / 2),
+      0.2,
+      25 - Math.floor(this.maze.size / 2)
+    );
     this.camera.lookAt(0, 1, 0);
-    const playerInitialPosition = new THREE.Vector3(25 - Math.floor(this.maze.size / 2), 0.2, 25 - Math.floor(this.maze.size / 2));
+    const playerInitialPosition = new THREE.Vector3(
+      25 - Math.floor(this.maze.size / 2),
+      0.2,
+      25 - Math.floor(this.maze.size / 2)
+    );
     this.player = new Player(this.scene, this.camera, playerInitialPosition);
 
     const npcPosition1 = new THREE.Vector3(-24, 0.5, -24);
-     const npcPosition2 = new THREE.Vector3(-24, 0.5, 24);
-     const npcPosition3 = new THREE.Vector3(24, 0.5, -24);
-     const npcPosition4 = new THREE.Vector3(24, 0.5, 24);
+    const npcPosition2 = new THREE.Vector3(-24, 0.5, 24);
+    const npcPosition3 = new THREE.Vector3(24, 0.5, -24);
+    const npcPosition4 = new THREE.Vector3(24, 0.5, 24);
 
-     this.npcs.push(new NPC(this.scene, this.collidableObjects, npcPosition1));
-     this.npcs.push(new NPC(this.scene, this.collidableObjects, npcPosition2));
-     this.npcs.push(new NPC(this.scene, this.collidableObjects, npcPosition3));
-     this.npcs.push(new NPC(this.scene, this.collidableObjects, npcPosition4));
+    this.npcs.push(new NPC(this.scene, this.collidableObjects, npcPosition1));
+    this.npcs.push(new NPC(this.scene, this.collidableObjects, npcPosition2));
+    this.npcs.push(new NPC(this.scene, this.collidableObjects, npcPosition3));
+    this.npcs.push(new NPC(this.scene, this.collidableObjects, npcPosition4));
     this.compass.show();
     this.addMaze();
     this.gameOver = false;
@@ -119,7 +128,6 @@ export class Game {
     directionalLight.position.set(0, 10, 10);
     this.scene.add(directionalLight);
   }
-
 
   async addMaze() {
     await this.wallCreator.textureLoaded;
@@ -162,17 +170,17 @@ export class Game {
         gridZ < this.maze.size &&
         !this.excludedPositions.some(([ex, ey]) => ex === gridX && ey === gridZ) // 예외 위치 확인
       ) {
-if (this.maze.canPlaceWall(gridX, gridZ)) {
-  this.maze.addWall(gridX, gridZ); // 행렬에 벽 추가
-  this.wallCreator.createWall(x, z); // 실제 좌표에 블록 추가
-  this.maze.print(); // 현재 미로 상태 출력
+        if (this.maze.canPlaceWall(gridX, gridZ)) {
+          this.maze.addWall(gridX, gridZ); // 행렬에 벽 추가
+          this.wallCreator.createWall(x, z); // 실제 좌표에 블록 추가
+          this.maze.print(); // 현재 미로 상태 출력
 
-  if (this.socket) {
-    this.socket.send(
-      JSON.stringify({ type: "placement", x, z, gridX, gridZ })
-    );
-  }
-} else {
+          if (this.socket) {
+            this.socket.send(
+              JSON.stringify({ type: "placement", x, z, gridX, gridZ })
+            );
+          }
+        } else {
           console.log(
             `Adding wall at (${gridX}, ${gridZ}) would block the path.`
           );
@@ -182,7 +190,6 @@ if (this.maze.canPlaceWall(gridX, gridZ)) {
       }
     });
   }
-
 
   checkCollisions() {
     const playerBox = new THREE.Box3().setFromObject(this.player.capsule);
